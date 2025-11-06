@@ -1,0 +1,3657 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+DAYU200_HI3861_ZNNY/
+  aht20_test.c
+  aht20.c
+  aht20.h
+  BUILD.gn
+  mqtt_test.c
+  new_xm01_zhny_temp.c
+  onenet_mqtt.c
+  onenet_test.c
+  onenet_test.h
+  onenet.h
+  random.c
+  random.h
+  sta_entry.c
+  tcp_test.c
+  udp_test.c
+  zhjt.h
+SmartAgriculture/
+  entry/
+    src/
+      main/
+        ets/
+          FormAbility/
+            form.ts
+          MainAbility/
+            pages/
+              common/
+                utils/
+                  time.ets
+                optionItem.ets
+              index.ets
+            app.ets
+        js/
+          widget/
+            common/
+              widget.png
+            i18n/
+              en-US.json
+              zh-CN.json
+            pages/
+              index/
+                index.css
+                index.hml
+                index.json
+        resources/
+          base/
+            element/
+              color.json
+              string.json
+            media/
+              icon_next.png
+              icon.png
+              moon.png
+              ny1.jpg
+              ny2.jpg
+              ny3.jpg
+              sun.png
+              zhny1.jpg
+              zhny2.jpg
+              zhny3.jpg
+              zhny4.jpg
+          en_US/
+            element/
+              string.json
+          zh_CN/
+            element/
+              string.json
+        config.json
+      ohosTest/
+        ets/
+          test/
+            Ability.test.ets
+            List.test.ets
+          TestAbility/
+            pages/
+              index.ets
+            app.ets
+          TestRunner/
+            OpenHarmonyTestRunner.ts
+        resources/
+          base/
+            element/
+              string.json
+            media/
+              icon.png
+        config.json
+    .gitignore
+    build-profile.json5
+    hvigorfile.ts
+    package.json
+  EntryCard/
+    entry/
+      base/
+        snapshot/
+          widget-2x2.png
+  .gitignore
+  build-profile.json5
+  hvigorfile.ts
+  package.json
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="DAYU200_HI3861_ZNNY/aht20_test.c">
+/*
+ * Copyright (C) 2021 HiHope Open Source Organization .
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ *
+ * limitations under the License.
+ */
+
+#include "aht20.h"
+
+#include <stdio.h>
+#include <unistd.h>
+
+#include "ohos_init.h"
+#include "cmsis_os2.h"
+#include "hi_gpio.h"
+#include "hi_io.h"
+#include "hi_i2c.h"
+</file>
+
+<file path="DAYU200_HI3861_ZNNY/aht20.c">
+/*
+ * Copyright (C) 2021 HiHope Open Source Organization .
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ *
+ * limitations under the License.
+ */
+
+#include "aht20.h"
+
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+
+#include "hi_i2c.h"
+#include "hi_errno.h"
+
+#define AHT20_I2C_IDX HI_I2C_IDX_0
+
+#define AHT20_STARTUP_TIME     20*1000 // 上电启动时间
+#define AHT20_CALIBRATION_TIME 40*1000 // 初始化（校准）时间
+#define AHT20_MEASURE_TIME     75*1000 // 测量时间
+
+#define AHT20_DEVICE_ADDR   0x38
+#define AHT20_READ_ADDR     ((0x38<<1)|0x1)
+#define AHT20_WRITE_ADDR    ((0x38<<1)|0x0)
+
+#define AHT20_CMD_CALIBRATION       0xBE // 初始化（校准）命令
+#define AHT20_CMD_CALIBRATION_ARG0  0x08
+#define AHT20_CMD_CALIBRATION_ARG1  0x00
+
+/**
+ * 传感器在采集时需要时间,主机发出测量指令（0xAC）后，延时75毫秒以上再读取转换后的数据并判断返回的状态位是否正常。
+ * 若状态比特位[Bit7]为0代表数据可正常读取，为1时传感器为忙状态，主机需要等待数据处理完成。
+ **/
+#define AHT20_CMD_TRIGGER       0xAC // 触发测量命令
+#define AHT20_CMD_TRIGGER_ARG0  0x33
+#define AHT20_CMD_TRIGGER_ARG1  0x00
+
+// 用于在无需关闭和再次打开电源的情况下，重新启动传感器系统，软复位所需时间不超过20 毫秒
+#define AHT20_CMD_RESET      0xBA // 软复位命令
+
+#define AHT20_CMD_STATUS     0x71 // 获取状态命令
+
+/**
+ * STATUS 命令回复：
+ * 1. 初始化后触发测量之前，STATUS 只回复 1B 状态值；
+ * 2. 触发测量之后，STATUS 回复6B： 1B 状态值 + 2B 湿度 + 4b湿度 + 4b温度 + 2B 温度
+ *      RH = Srh / 2^20 * 100%
+ *      T  = St  / 2^20 * 200 - 50
+ **/
+#define AHT20_STATUS_BUSY_SHIFT 7       // bit[7] Busy indication
+#define AHT20_STATUS_BUSY_MASK  (0x1<<AHT20_STATUS_BUSY_SHIFT)
+#define AHT20_STATUS_BUSY(status) ((status & AHT20_STATUS_BUSY_MASK) >> AHT20_STATUS_BUSY_SHIFT)
+
+#define AHT20_STATUS_MODE_SHIFT 5       // bit[6:5] Mode Status
+#define AHT20_STATUS_MODE_MASK  (0x3<<AHT20_STATUS_MODE_SHIFT)
+#define AHT20_STATUS_MODE(status) ((status & AHT20_STATUS_MODE_MASK) >> AHT20_STATUS_MODE_SHIFT)
+
+                                        // bit[4] Reserved
+#define AHT20_STATUS_CALI_SHIFT 3       // bit[3] CAL Enable
+#define AHT20_STATUS_CALI_MASK  (0x1<<AHT20_STATUS_CALI_SHIFT)
+#define AHT20_STATUS_CALI(status) ((status & AHT20_STATUS_CALI_MASK) >> AHT20_STATUS_CALI_SHIFT)
+                                        // bit[2:0] Reserved
+
+#define AHT20_STATUS_RESPONSE_MAX 6
+
+#define AHT20_RESOLUTION            (1<<20)  // 2^20
+
+#define AHT20_MAX_RETRY 10
+
+static uint32_t AHT20_Read(uint8_t* buffer, uint32_t buffLen)
+{
+    hi_i2c_data data = { 0 };
+    data.receive_buf = buffer;
+    data.receive_len = buffLen;
+    uint32_t retval = hi_i2c_read(AHT20_I2C_IDX, AHT20_READ_ADDR, &data);
+    if (retval != HI_ERR_SUCCESS) {
+        printf("I2cRead() failed, %0X!\n", retval);
+        return retval;
+    }
+    return HI_ERR_SUCCESS;
+}
+
+static uint32_t AHT20_Write(uint8_t* buffer, uint32_t buffLen)
+{
+    hi_i2c_data data = { 0 };
+    data.send_buf = buffer;
+    data.send_len = buffLen;
+    uint32_t retval = hi_i2c_write(AHT20_I2C_IDX, AHT20_WRITE_ADDR, &data);
+    if (retval != HI_ERR_SUCCESS) {
+        printf("I2cWrite(%02X) failed, %0X!\n", buffer[0], retval);
+        return retval;
+    }
+    return HI_ERR_SUCCESS;
+}
+
+// 发送获取状态命令
+static uint32_t AHT20_StatusCommand(void)
+{
+    uint8_t statusCmd[] = { AHT20_CMD_STATUS };
+    return AHT20_Write(statusCmd, sizeof(statusCmd));
+}
+
+// 发送软复位命令
+static uint32_t AHT20_ResetCommand(void)
+{
+    uint8_t resetCmd[] = {AHT20_CMD_RESET};
+    return AHT20_Write(resetCmd, sizeof(resetCmd));
+}
+
+// 发送初始化校准命令
+static uint32_t AHT20_CalibrateCommand(void)
+{
+    uint8_t clibrateCmd[] = {AHT20_CMD_CALIBRATION, AHT20_CMD_CALIBRATION_ARG0, AHT20_CMD_CALIBRATION_ARG1};
+    return AHT20_Write(clibrateCmd, sizeof(clibrateCmd));
+}
+
+// 读取温湿度值之前， 首先要看状态字的校准使能位Bit[3]是否为 1(通过发送0x71可以获取一个字节的状态字)，
+// 如果不为1，要发送0xBE命令(初始化)，此命令参数有两个字节， 第一个字节为0x08，第二个字节为0x00。
+uint32_t AHT20_Calibrate(void)
+{
+    uint32_t retval = 0;
+    uint8_t buffer[AHT20_STATUS_RESPONSE_MAX];
+    memset(&buffer, 0x0, sizeof(buffer));
+
+    retval = AHT20_StatusCommand();
+    if (retval != HI_ERR_SUCCESS) {
+        return retval;
+    }
+
+    retval = AHT20_Read(buffer, sizeof(buffer));
+    if (retval != HI_ERR_SUCCESS) {
+        return retval;
+    }
+
+    if (AHT20_STATUS_BUSY(buffer[0]) || !AHT20_STATUS_CALI(buffer[0])) {
+        retval = AHT20_ResetCommand();
+        if (retval != HI_ERR_SUCCESS) {
+            return retval;
+        }
+        usleep(AHT20_STARTUP_TIME);
+        retval = AHT20_CalibrateCommand();
+        usleep(AHT20_CALIBRATION_TIME);
+        return retval;
+    }
+
+    return HI_ERR_SUCCESS;
+}
+
+// 发送 触发测量 命令，开始测量
+uint32_t AHT20_StartMeasure(void)
+{
+    uint8_t triggerCmd[] = {AHT20_CMD_TRIGGER, AHT20_CMD_TRIGGER_ARG0, AHT20_CMD_TRIGGER_ARG1};
+    return AHT20_Write(triggerCmd, sizeof(triggerCmd));
+}
+
+// 接收测量结果，拼接转换为标准值
+uint32_t AHT20_GetMeasureResult(float* temp, float* humi)
+{
+    uint32_t retval = 0, i = 0;
+    if (temp == NULL || humi == NULL) {
+        return HI_ERR_FAILURE;
+    }
+
+    uint8_t buffer[AHT20_STATUS_RESPONSE_MAX];
+    memset(&buffer, 0x0, sizeof(buffer));
+    retval = AHT20_Read(buffer, sizeof(buffer));  // recv status command result
+    if (retval != HI_ERR_SUCCESS) {
+        return retval;
+    }
+
+    for (i = 0; AHT20_STATUS_BUSY(buffer[0]) && i < AHT20_MAX_RETRY; i++) {
+        // printf("AHT20 device busy, retry %d/%d!\r\n", i, AHT20_MAX_RETRY);
+        usleep(AHT20_MEASURE_TIME);
+        retval = AHT20_Read(buffer, sizeof(buffer));  // recv status command result
+        if (retval != HI_ERR_SUCCESS) {
+            return retval;
+        }
+    }
+    if (i >= AHT20_MAX_RETRY) {
+        printf("AHT20 device always busy!\r\n");
+        return HI_ERR_SUCCESS;
+    }
+
+    uint32_t humiRaw = buffer[1];
+    humiRaw = (humiRaw << 8) | buffer[2];
+    humiRaw = (humiRaw << 4) | ((buffer[3] & 0xF0) >> 4);
+    *humi = humiRaw / (float)AHT20_RESOLUTION * 100;
+
+    uint32_t tempRaw = buffer[3] & 0x0F;
+    tempRaw = (tempRaw << 8) | buffer[4];
+    tempRaw = (tempRaw << 8) | buffer[5];
+    *temp = tempRaw / (float)AHT20_RESOLUTION * 200 - 50;
+    // printf("humi = %05X, %f, temp= %05X, %f\r\n", humiRaw, *humi, tempRaw, *temp);
+    return HI_ERR_SUCCESS;
+}
+</file>
+
+<file path="DAYU200_HI3861_ZNNY/aht20.h">
+/*
+ * Copyright (C) 2021 HiHope Open Source Organization .
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ *
+ * limitations under the License.
+ */
+
+#ifndef AHT20_H
+#define AHT20_H
+
+#include <stdint.h>
+
+uint32_t AHT20_Calibrate(void);
+
+uint32_t AHT20_StartMeasure(void);
+
+uint32_t AHT20_GetMeasureResult(float* temp, float* humi);
+
+#endif  // AHT20_H
+</file>
+
+<file path="DAYU200_HI3861_ZNNY/BUILD.gn">
+# Copyright (c) 2020 Huawei Device Co., Ltd.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+static_library("DAYU200_HI3861_ZNNY") {
+    sources = [
+        "new_xm01_zhny_temp.c",
+        "sta_entry.c",
+        "udp_test.c",
+        "tcp_test.c",
+        "aht20_test.c",
+        "aht20.c",
+        "onenet_mqtt.c",
+        "random.c",
+    ]
+
+    include_dirs = [
+        "//utils/native/lite/include",
+        "//kernel/liteos_m/kal/cmsis",
+        "//base/iot_hardware/peripheral/interfaces/kits",
+        "//device/hisilicon/hispark_pegasus/hi3861_adapter/hals/communication/wifi_lite/wifiservice",
+        "//device/hisilicon/hispark_pegasus/hi3861_adapter/kal",
+        "//device/hisilicon/hispark_pegasus/sdk_liteos/third_party/lwip_sack/include",
+        "//third_party/cJSON/",
+        "//foundation/communication/wifi_lite/interfaces/wifiservice",
+        "//base/iot_hardware/peripheral/interfaces/inner_api",
+        "//base/iot_hardware/peripheral/interfaces/inner_api",
+    ]
+
+    deps = [
+        "//third_party/mqtt_sdk:pahomqtt_static",
+        # "//third_party/pahomqtt:pahomqtt_static",
+        "//third_party/ssd1306:oled_ssd1306",
+    ]
+}
+</file>
+
+<file path="DAYU200_HI3861_ZNNY/mqtt_test.c">
+#include <stdio.h>
+#include <unistd.h>
+#include "ohos_init.h"
+#include "cmsis_os2.h"
+
+#include "hi_wifi_api.h"
+#include "lwip/ip_addr.h"
+#include "lwip/netifapi.h"
+#include "lwip/sockets.h"
+
+#include "MQTTClient.h"
+
+#include "iot_gpio.h"
+
+#define LED_TEST_GPIO 9 // for hispark_pegasus
+
+
+static MQTTClient mq_client;
+
+ unsigned char *onenet_mqtt_buf;
+ unsigned char *onenet_mqtt_readbuf;
+ int buf_size;
+
+Network n;
+MQTTPacket_connectData data = MQTTPacket_connectData_initializer;  
+
+//ćśćŻĺč°ĺ˝ć°
+void mqtt_callback(MessageData *msg_data)
+{
+    size_t res_len = 0;
+    uint8_t *response_buf = NULL;
+    char topicname[45] = { "$crsp/" };
+
+    LOS_ASSERT(msg_data);
+
+    printf("topic %.*s receive a message\r\n", msg_data->topicName->lenstring.len, msg_data->topicName->lenstring.data);
+
+    printf("message is %.*s\r\n", msg_data->message->payloadlen, msg_data->message->payload);
+
+	if(memcmp(msg_data->message->payload, "led on", strlen("led on")) == 0)
+	{
+		printf("led on\r\n");
+		IoTGpioSetOutputVal(LED_TEST_GPIO, 1);
+	}else if(memcmp(msg_data->message->payload, "led off", strlen("led off")) == 0){
+		printf("led off\r\n");
+		IoTGpioSetOutputVal(LED_TEST_GPIO, 0);
+	}
+
+}
+
+int mqtt_connect(void)
+{
+	int rc = 0;
+    
+	//ĺĺ§ĺGPIO
+    IoTGpioInit(LED_TEST_GPIO);
+
+    //čŽžç˝Žä¸şčžĺ?
+    IoTGpioSetDir(LED_TEST_GPIO, IOT_GPIO_DIR_OUT);
+
+    //MQTTç˝çťĺĺ§ĺ?
+	NetworkInit(&n);
+	//čżćĽĺ°MQTTćĺĄĺ?
+	NetworkConnect(&n, "54.87.92.106", 1883);
+
+    //çťMQTTĺéĺ¤ĺ°
+    buf_size  = 4096+1024;
+    onenet_mqtt_buf = (unsigned char *) malloc(buf_size);
+    onenet_mqtt_readbuf = (unsigned char *) malloc(buf_size);
+    if (!(onenet_mqtt_buf && onenet_mqtt_readbuf))
+    {
+        printf("No memory for MQTT client buffer!");
+        return -2;
+    }
+
+    //MQTTĺŽ˘ćˇçŤ?
+	MQTTClientInit(&mq_client, &n, 1000, onenet_mqtt_buf, buf_size, onenet_mqtt_readbuf, buf_size);
+	
+    //ĺŻĺ¨MQTTççşżç¨?
+    MQTTStartTask(&mq_client);
+
+
+    data.keepAliveInterval = 30;
+    data.cleansession = 1;
+	data.clientID.cstring = "template";
+	data.username.cstring = "d1K23h7550";
+	data.password.cstring = "version=2018-10-31&res=products%2Fd1K23h7550%2Fdevices%2Ftemplate&et=1828559681&method=md5&sign=Nrs5hrJZwsa1cKvJLLs4ig%3D%3D
+";
+	data.cleansession = 1;
+	
+    mq_client.defaultMessageHandler = mqtt_callback;
+
+	//čżćĽćĺĄĺ?
+	rc = MQTTConnect(&mq_client, &data);
+
+	//čŽ˘é ä¸ťé˘led
+	MQTTSubscribe(&mq_client, "led", 0, mqtt_callback);
+
+	while(1)
+	{
+		MQTTMessage message;
+
+		message.qos = QOS1;
+		message.retained = 0;
+		message.payload = (void *)"openharmony";
+		message.payloadlen = strlen("openharmony");
+
+		//ĺéćść? ohospub ďźä¸ťé˘?   messageďźĺĺŽ?
+		if (MQTTPublish(&mq_client, "ohospub", &message) < 0)
+		{
+			printf("MQTTPublish faild !\r\n");
+		}
+		usleep(1000000);
+	}
+
+	return 0;
+}
+
+
+void ___mqtt_test(void)
+{
+    mqtt_connect();
+}
+</file>
+
+<file path="DAYU200_HI3861_ZNNY/onenet_mqtt.c">
+/*
+ * File      : onenet_mqtt.c
+ * COPYRIGHT (C) 2020-10, Lian Zhian
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License along
+ *  with this program; if not, write to the Free Software Foundation, Inc.,
+ *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Change Logs:
+ * Date           Author       Notes
+ * 2020-10-24     lianzhian     first version
+ */
+
+#include "MQTTClient.h"
+#include "onenet.h"
+
+/*
+#define ONENET_INFO_DEVID "597952816"
+#define ONENET_INFO_AUTH "202005160951"
+#define ONENET_INFO_APIKEY "zgQdlB5y3Bi9pNd2bUYmS8TJHIY="
+#define ONENET_INFO_PROID "345377"
+#define ONENET_MASTER_APIKEY "gwaK2wJT5wgnSbJYz67CVRGvwkI="
+*/
+#define ONENET_INFO_DEVID "xxxxxx"
+#define ONENET_INFO_AUTH "xxxxxx"
+#define ONENET_INFO_APIKEY "xxxxxx="
+#define ONENET_INFO_PROID "xxxxxx"
+#define ONENET_MASTER_APIKEY "xxxxxx"
+
+
+
+
+#define  ONENET_TOPIC_DP    "$dp"
+
+static char init_ok = FALSE;
+static MQTTClient mq_client;
+struct rt_onenet_info onenet_info;
+
+struct onenet_device
+{
+    struct rt_onenet_info *onenet_info;
+
+    void(*cmd_rsp_cb)(uint8_t *recv_data, size_t recv_size, uint8_t **resp_data, size_t *resp_size);
+
+} onenet_mqtt;
+
+ void mqtt_callback(MessageData *msg_data)
+{
+    size_t res_len = 0;
+    uint8_t *response_buf = NULL;
+    char topicname[45] = { "$crsp/" };
+
+    LOS_ASSERT(msg_data);
+
+    //LOG_D("topic %.*s receive a message", msg_data->topicName->lenstring.len, msg_data->topicName->lenstring.data);
+
+    //LOG_D("message length is %d", msg_data->message->payloadlen);
+
+    if (onenet_mqtt.cmd_rsp_cb != NULL)
+    {
+        onenet_mqtt.cmd_rsp_cb((uint8_t *) msg_data->message->payload, msg_data->message->payloadlen, &response_buf,
+                &res_len);
+
+        if (response_buf != NULL || res_len != 0)
+        {
+            strncat(topicname, &(msg_data->topicName->lenstring.data[6]), msg_data->topicName->lenstring.len - 6);
+
+            onenet_mqtt_publish(topicname, response_buf, strlen((const char *)response_buf));
+
+            ONENET_FREE(response_buf);
+
+        }
+
+    }
+
+}
+
+ unsigned char *onenet_mqtt_buf;
+ unsigned char *onenet_mqtt_readbuf;
+ int buf_size;
+
+Network n;
+MQTTPacket_connectData data = MQTTPacket_connectData_initializer;  
+
+static int onenet_mqtt_entry(void)
+{
+    int rc = 0;
+    
+	NetworkInit(&n);
+	NetworkConnect(&n, ONENET_SERVER_IP, ONENET_SERVER_PORT);
+
+    buf_size  = 2048;
+    onenet_mqtt_buf = (unsigned char *) malloc(buf_size);
+    onenet_mqtt_readbuf = (unsigned char *) malloc(buf_size);
+    if (!(onenet_mqtt_buf && onenet_mqtt_readbuf))
+    {
+        printf("No memory for MQTT client buffer!");
+        return -2;
+    }
+
+	MQTTClientInit(&mq_client, &n, 1000, onenet_mqtt_buf, buf_size, onenet_mqtt_readbuf, buf_size);
+	
+    MQTTStartTask(&mq_client);
+
+
+    data.keepAliveInterval = 30;
+    data.cleansession = 1;
+	data.clientID.cstring = onenet_info.device_id;
+	data.username.cstring = onenet_info.pro_id;
+	data.password.cstring = onenet_info.auth_info;
+
+	data.keepAliveInterval = 10;
+	data.cleansession = 1;
+	
+    mq_client.defaultMessageHandler = mqtt_callback;
+
+	rc = MQTTConnect(&mq_client, &data);
+
+
+    return rc;
+    
+}
+
+static int onenet_get_info(void)
+{
+    char dev_id[ONENET_INFO_DEVID_LEN] = { 0 };
+    char api_key[ONENET_INFO_APIKEY_LEN] = { 0 };
+    char auth_info[ONENET_INFO_AUTH_LEN] = { 0 };
+
+#ifdef ONENET_USING_AUTO_REGISTER
+    char name[ONENET_INFO_NAME_LEN] = { 0 };
+    
+    if (!onenet_port_is_registed())
+    {
+        if (onenet_port_get_register_info(name, auth_info) < 0)
+        {
+            //LOG_E("onenet get register info fail!");
+            return -1;
+        }
+
+        if (onenet_http_register_device(name, auth_info) < 0)
+        {
+            //LOG_E("onenet register device fail! name is %s,auth info is %s", name, auth_info);
+            return -1;
+        }
+    }
+
+    if (onenet_port_get_device_info(dev_id, api_key, auth_info))
+    {
+        //LOG_E("onenet get device id fail,dev_id is %s,api_key is %s,auth_info is %s", dev_id, api_key, auth_info);
+        return -1;
+    }
+
+#else
+    strncpy(dev_id, ONENET_INFO_DEVID, strlen(ONENET_INFO_DEVID));
+    strncpy(api_key, ONENET_INFO_APIKEY, strlen(ONENET_INFO_APIKEY));
+    strncpy(auth_info, ONENET_INFO_AUTH, strlen(ONENET_INFO_AUTH));
+#endif
+
+    if (strlen(api_key) < 15)
+    {
+        strncpy(api_key, ONENET_MASTER_APIKEY, strlen(ONENET_MASTER_APIKEY));
+    }
+
+    //使用默认的设备信息
+    if(onenet_info.user_device_id_flg == 0)
+    {
+        strncpy(onenet_info.device_id, dev_id, strlen(dev_id));
+        strncpy(onenet_info.pro_id, ONENET_INFO_PROID, strlen(ONENET_INFO_PROID));
+        strncpy(onenet_info.auth_info, auth_info, strlen(auth_info));
+        strncpy(onenet_info.api_key, api_key, strlen(api_key));
+    }
+
+    strncpy(onenet_info.server_uri, ONENET_SERVER_URL, strlen(ONENET_SERVER_URL));
+    return 0;
+}
+
+void device_info_init(char *device_id, char * pro_id, char *auth_info, char *api_key, char *master_api_key)
+{
+    onenet_info.user_device_id_flg = 1;
+    strncpy(onenet_info.device_id,  device_id, strlen(device_id));
+    strncpy(onenet_info.pro_id,     pro_id, strlen(pro_id));
+    strncpy(onenet_info.auth_info,  auth_info, strlen(auth_info));
+
+    if (strlen(api_key) < 15)
+    {
+        strncpy(api_key, master_api_key, strlen(master_api_key));
+    }else{
+        strncpy(onenet_info.api_key,    api_key, strlen(api_key));
+    }
+}
+
+/**
+ * onenet mqtt client init.
+ *
+ * @param   NULL
+ *
+ * @return  0 : init success
+ *         -1 : get device info fail
+ *         -2 : onenet mqtt client init fail
+ */
+int onenet_mqtt_init(void)
+{
+    int result = 0;
+
+    if (init_ok)
+    {
+        //LOG_D("onenet mqtt already init!");
+        return 0;
+    }
+
+    if (onenet_get_info() < 0)
+    {
+        result = -1;
+        goto __exit;
+    }
+
+    onenet_mqtt.onenet_info = &onenet_info;
+    onenet_mqtt.cmd_rsp_cb = NULL;
+
+    if (onenet_mqtt_entry() < 0)
+    {
+        result = -2;
+        goto __exit;
+    }
+
+__exit:
+    if (!result)
+    {
+        //LOG_I("RT-Thread OneNET package(V%s) initialize success.", ONENET_SW_VERSION);
+        init_ok = 0;
+    }
+    else
+    {
+        //LOG_E("RT-Thread OneNET package(V%s) initialize failed(%d).", ONENET_SW_VERSION, result);
+    }
+    return result;
+}
+
+/**
+ * mqtt publish msg to topic
+ *
+ * @param   topic   target topic
+ * @param   msg     message to be sent
+ * @param   len     message length
+ *
+ * @return  0 : publish success
+ *         -1 : publish fail
+ */
+int onenet_mqtt_publish(const char *topic, const uint8_t *msg, size_t len)
+{
+    MQTTMessage message;
+
+    LOS_ASSERT(topic);
+    LOS_ASSERT(msg);
+
+    message.qos = QOS1;
+    message.retained = 0;
+    message.payload = (void *) msg;
+    message.payloadlen = len;
+
+    if (MQTTPublish(&mq_client, topic, &message) < 0)
+    {
+        return -1;
+    }
+
+    return 0;
+}
+
+
+static int onenet_mqtt_get_digit_data(const char *ds_name, const double digit, char **out_buff, size_t *length)
+{
+    int result = 0;
+    cJSON *root = NULL;
+    char *msg_str = NULL;
+
+    LOS_ASSERT(ds_name);
+    LOS_ASSERT(out_buff);
+    LOS_ASSERT(length);
+
+    root = cJSON_CreateObject();
+    if (!root)
+    {
+        //LOG_E("MQTT publish digit data failed! cJSON create object error return NULL!");
+        return -2;
+    }
+
+    cJSON_AddNumberToObject(root, ds_name, digit);
+
+    /* render a cJSON structure to buffer */
+    msg_str = cJSON_PrintUnformatted(root);
+    if (!msg_str)
+    {
+        //LOG_E("MQTT publish digit data failed! cJSON print unformatted error return NULL!");
+        result = -2;
+        goto __exit;
+    }
+
+    *out_buff = ONENET_MALLOC(strlen(msg_str) + 3);
+    if (!(*out_buff))
+    {
+        //LOG_E("ONENET mqtt upload digit data failed! No memory for send buffer!");
+        return -2;
+    }
+
+    strncpy(&(*out_buff)[3], msg_str, strlen(msg_str));
+    *length = strlen(&(*out_buff)[3]);
+
+    /* mqtt head and json length */
+    (*out_buff)[0] = 0x03;
+    (*out_buff)[1] = (*length & 0xff00) >> 8;
+    (*out_buff)[2] = *length & 0xff;
+    *length += 3;
+
+__exit:
+    if (root)
+    {
+        cJSON_Delete(root);
+    }
+    if (msg_str)
+    {
+        cJSON_free(msg_str);
+    }
+
+    return result;
+}
+
+/**
+ * Upload digit data to OneNET cloud.
+ *
+ * @param   ds_name     datastream name
+ * @param   digit       digit data
+ *
+ * @return  0 : upload digit data success
+ *         -5 : no memory
+ */
+int onenet_mqtt_upload_digit(const char *ds_name, const double digit)
+{
+    char *send_buffer = NULL;
+    int result = 0;
+    size_t length = 0;
+
+    LOS_ASSERT(ds_name);
+
+    result = onenet_mqtt_get_digit_data(ds_name, digit, &send_buffer, &length);
+    if (result < 0)
+    {
+        goto __exit;
+    }
+
+    result = onenet_mqtt_publish(ONENET_TOPIC_DP, (uint8_t *)send_buffer, length);
+    if (result < 0)
+    {
+        //LOG_E("onenet publish failed (%d)!", result);
+        goto __exit;
+    }
+
+__exit:
+    if (send_buffer)
+    {
+        ONENET_FREE(send_buffer);
+    }
+
+    return result;
+}
+
+static int onenet_mqtt_get_string_data(const char *ds_name, const char *str, char **out_buff, size_t *length)
+{
+    int result = 0;
+    cJSON *root = NULL;
+    char *msg_str = NULL;
+
+    LOS_ASSERT(ds_name);
+    LOS_ASSERT(str);
+    LOS_ASSERT(out_buff);
+    LOS_ASSERT(length);
+
+    root = cJSON_CreateObject();
+    if (!root)
+    {
+        //LOG_E("MQTT publish string data failed! cJSON create object error return NULL!");
+        return -2;
+    }
+
+    cJSON_AddStringToObject(root, ds_name, str);
+
+    /* render a cJSON structure to buffer */
+    msg_str = cJSON_PrintUnformatted(root);
+    if (!msg_str)
+    {
+        //LOG_E("MQTT publish string data failed! cJSON print unformatted error return NULL!");
+        result = -2;
+        goto __exit;
+    }
+
+    *out_buff = ONENET_MALLOC(strlen(msg_str) + 3);
+    if (!(*out_buff))
+    {
+        //LOG_E("ONENET mqtt upload string data failed! No memory for send buffer!");
+        return -2;
+    }
+
+    strncpy(&(*out_buff)[3], msg_str, strlen(msg_str));
+    *length = strlen(&(*out_buff)[3]);
+
+    /* mqtt head and json length */
+    (*out_buff)[0] = 0x03;
+    (*out_buff)[1] = (*length & 0xff00) >> 8;
+    (*out_buff)[2] = *length & 0xff;
+    *length += 3;
+
+__exit:
+    if (root)
+    {
+        cJSON_Delete(root);
+    }
+    if (msg_str)
+    {
+        cJSON_free(msg_str);
+    }
+
+    return result;
+}
+
+/**
+ * upload string data to OneNET cloud.
+ *
+ * @param   ds_name     datastream name
+ * @param   str         string data
+ *
+ * @return  0 : upload digit data success
+ *         -5 : no memory
+ */
+int onenet_mqtt_upload_string(const char *ds_name, const char *str)
+{
+    char *send_buffer = NULL;
+    int result = 0;
+    size_t length = 0;
+
+    LOS_ASSERT(ds_name);
+    LOS_ASSERT(str);
+
+    result = onenet_mqtt_get_string_data(ds_name, str, &send_buffer, &length);
+    if (result < 0)
+    {
+        goto __exit;
+    }
+
+    result = onenet_mqtt_publish(ONENET_TOPIC_DP, (uint8_t *)send_buffer, length);
+    if (result < 0)
+    {
+        //LOG_E("onenet mqtt publish digit data failed!");
+        goto __exit;
+    }
+
+__exit:
+    if (send_buffer)
+    {
+        ONENET_FREE(send_buffer);
+    }
+
+    return result;
+}
+
+/**
+ * set the command responses call back function
+ *
+ * @param   cmd_rsp_cb  command responses call back function
+ *
+ * @return  0 : set success
+ *         -1 : function is null
+ */
+void onenet_set_cmd_rsp_cb(void (*cmd_rsp_cb)(uint8_t *recv_data, size_t recv_size, uint8_t **resp_data, size_t *resp_size))
+{
+
+    onenet_mqtt.cmd_rsp_cb = cmd_rsp_cb;
+
+}
+
+static int onenet_mqtt_get_bin_data(const char *str, const uint8_t *bin, int binlen, uint8_t **out_buff, size_t *length)
+{
+    int result = 0;
+    cJSON *root = NULL;
+    char *msg_str = NULL;
+
+    LOS_ASSERT(str);
+    LOS_ASSERT(bin);
+    LOS_ASSERT(out_buff);
+    LOS_ASSERT(length);
+
+    root = cJSON_CreateObject();
+    if (!root)
+    {
+        //LOG_E("MQTT online push failed! cJSON create object error return NULL!");
+        return -2;
+    }
+
+    cJSON_AddStringToObject(root, "ds_id", str);
+
+    /* render a cJSON structure to buffer */
+    msg_str = cJSON_PrintUnformatted(root);
+    if (!msg_str)
+    {
+        //LOG_E("Device online push failed! cJSON print unformatted error return NULL!");
+        result = -2;
+        goto __exit;
+    }
+
+    /* size = header(3) + json + binary length(4) + binary length +'\0' */
+    *out_buff = (uint8_t *) ONENET_MALLOC(strlen(msg_str) + 3 + 4 + binlen + 1);
+
+    strncpy((char *)&(*out_buff)[3], msg_str, strlen(msg_str));
+    *length = strlen((const char *)&(*out_buff)[3]);
+
+    /* mqtt head and cjson length */
+    (*out_buff)[0] = 0x02;
+    (*out_buff)[1] = (*length & 0xff00) >> 8;
+    (*out_buff)[2] = *length & 0xff;
+    *length += 3;
+
+    /* binary data length */
+    (*out_buff)[(*length)++] = (binlen & 0xff000000) >> 24;
+    (*out_buff)[(*length)++] = (binlen & 0x00ff0000) >> 16;
+    (*out_buff)[(*length)++] = (binlen & 0x0000ff00) >> 8;
+    (*out_buff)[(*length)++] = (binlen & 0x000000ff);
+
+    memcpy(&((*out_buff)[*length]), bin, binlen);
+    *length = *length + binlen;
+
+__exit:
+    if (root)
+    {
+        cJSON_Delete(root);
+    }
+    if (msg_str)
+    {
+        cJSON_free(msg_str);
+    }
+
+    return result;
+}
+
+/**
+ * upload binary data to onenet cloud by path
+ *
+ * @param   ds_name     datastream name
+ * @param   bin         binary file
+ * @param   len         binary file length
+ *
+ * @return  0 : upload success
+ *         -1 : invalid argument or open file fail
+ */
+int onenet_mqtt_upload_bin(const char *ds_name, uint8_t *bin, size_t len)
+{
+    size_t length = 0;
+    int result = 0;
+    uint8_t *send_buffer = NULL;
+
+    LOS_ASSERT(ds_name);
+    LOS_ASSERT(bin);
+
+    result = onenet_mqtt_get_bin_data(ds_name, bin, len, &send_buffer, &length);
+    if (result < 0)
+    {
+        result = -1;
+        goto __exit;
+    }
+
+    result = onenet_mqtt_publish(ONENET_TOPIC_DP, send_buffer, length);
+    if (result < 0)
+    {
+        //LOG_E("onenet publish data failed(%d)!", result);
+        result = -1;
+        goto __exit;
+    }
+
+__exit:
+    if (send_buffer)
+    {
+        ONENET_FREE(send_buffer);
+    }
+
+    return result;
+}
+</file>
+
+<file path="DAYU200_HI3861_ZNNY/onenet_test.c">
+#include <stdio.h>
+#include <unistd.h>
+#include "MQTTClient.h"
+#include "onenet.h"
+
+//1011738446
+#define ONENET_INFO_DEVID "1151356328"
+
+//20221031aa
+#define ONENET_INFO_AUTH "yangqun"
+
+//JDww3LcZCh3Ujy3R2etGnWkBNdE=
+#define ONENET_INFO_APIKEY "SjQk5LuayemADvWHLQFyKeolAkU="
+
+//345377
+#define ONENET_INFO_PROID "617100"
+
+//gwaK2wJT5wgnSbJYz67CVRGvwkI=
+#define ONENET_MASTER_APIKEY "6BJA1T2TXpCBw7U8GkN4FCHEif0="
+
+extern int rand(void);
+
+
+void onenet_cmd_rsp_cb(uint8_t *recv_data, size_t recv_size, uint8_t **resp_data, size_t *resp_size)
+{
+    printf("recv data is %.*s\n", recv_size, recv_data);
+
+    *resp_data = NULL;
+    *resp_size = 0;
+}
+
+int onenet_test(void)
+{
+	
+    device_info_init(ONENET_INFO_DEVID, ONENET_INFO_PROID, ONENET_INFO_AUTH, ONENET_INFO_APIKEY, ONENET_MASTER_APIKEY);
+    onenet_mqtt_init();
+
+    onenet_set_cmd_rsp_cb(onenet_cmd_rsp_cb);
+
+	while (1)
+    {
+		int value = 0;
+		
+        value = rand() % 100;
+
+        if (onenet_mqtt_upload_digit("temperature", value) < 0)
+        {
+            printf("upload has an error, stop uploading");
+            //break;
+        }
+        else
+        {
+            printf("buffer : {\"temperature\":%d} \r\n", value);
+        }
+        sleep(1);
+    }
+	return 0;
+}
+</file>
+
+<file path="DAYU200_HI3861_ZNNY/onenet_test.h">
+/*
+ * Copyright (c) 2020 HiSilicon (Shanghai) Technologies CO., LIMITED.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#ifndef __MQTT_TEST_H__
+#define __MQTT_TEST_H__
+
+void onenet_test(void);
+
+#endif /* __MQTT_TEST_H__ */
+</file>
+
+<file path="DAYU200_HI3861_ZNNY/onenet.h">
+/*
+ * File      : onenet_mqtt.c
+ * COPYRIGHT (C) 2020-10, Lian Zhian
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License along
+ *  with this program; if not, write to the Free Software Foundation, Inc.,
+ *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Change Logs:
+ * Date           Author       Notes
+ * 2020-10-24     lianzhian     first version
+ */
+#ifndef _ONENET_H_
+#define _ONENET_H_
+
+
+#include <unistd.h>
+
+#include "cJSON.h"
+
+#define ONENET_DEBUG                   1
+
+#define ONENET_SW_VERSION              "1.0.0"
+
+#ifndef ONENET_MALLOC
+#define ONENET_MALLOC                  malloc
+#endif
+
+#ifndef ONENET_CALLOC
+#define ONENET_CALLOC                  calloc
+#endif
+
+#ifndef ONENET_FREE
+#define ONENET_FREE                    free
+#endif
+
+#ifndef ONENET_MQTT_SUBTOPIC
+#define ONENET_MQTT_SUBTOPIC           "/topic_test"
+#endif
+
+#define ONENET_SERVER_URL              "tcp://183.230.40.39:6002"
+#define ONENET_SERVER_IP                "183.230.40.39"
+#define ONENET_SERVER_PORT              6002
+#define ONENET_INFO_DEVID_LEN          16
+#define ONENET_INFO_APIKEY_LEN         32
+#define ONENET_INFO_PROID_LEN          16
+#define ONENET_INFO_AUTH_LEN           64
+#define ONENET_INFO_NAME_LEN           64
+#define ONENET_INFO_URL_LEN            32
+
+#define ONENET_DATASTREAM_NAME_MAX     32
+
+struct rt_onenet_info
+{
+    char device_id[ONENET_INFO_DEVID_LEN];
+    char api_key[ONENET_INFO_APIKEY_LEN];
+
+    char pro_id[ONENET_INFO_PROID_LEN];
+    char auth_info[ONENET_INFO_AUTH_LEN];
+
+    char server_uri[ONENET_INFO_URL_LEN];
+
+    char user_device_id_flg;
+};
+typedef struct rt_onenet_info *rt_onenet_info_t;
+
+/* onenet datastream info */
+struct rt_onenet_ds_info
+{
+    char id[ONENET_DATASTREAM_NAME_MAX];
+    char tags[ONENET_DATASTREAM_NAME_MAX];
+
+    char update_time[ONENET_DATASTREAM_NAME_MAX];
+    char create_time[ONENET_DATASTREAM_NAME_MAX];
+
+    char unit[ONENET_DATASTREAM_NAME_MAX];
+    char unit_symbol[ONENET_DATASTREAM_NAME_MAX];
+
+    char current_value[ONENET_DATASTREAM_NAME_MAX];
+
+};
+typedef struct rt_onenet_ds_info *rt_onenet_ds_info_t;
+
+//设置设备信息
+void device_info_init(char *device_id, char * pro_id, char *auth_info, char *api_key, char *master_api_key);
+
+/* OneNET MQTT initialize. */
+int onenet_mqtt_init(void);
+
+/* Publish MQTT data to subscribe topic. */
+int onenet_mqtt_publish(const char *topic, const uint8_t *msg, size_t len);
+
+#ifdef RT_USING_DFS
+/* Publish MQTT binary data to onenet by path. */
+int onenet_mqtt_upload_bin_by_path(const char *ds_name, const char *bin_path);
+#endif
+
+/* Publish MQTT binary data to onenet. */
+int onenet_mqtt_upload_bin(const char *ds_name, uint8_t *bin, size_t len);
+
+/* Publish MQTT string data to onenet. */
+int onenet_mqtt_upload_string(const char *ds_name, const char *str);
+/* Publish MQTT digit data to onenet. */
+int onenet_mqtt_upload_digit(const char *ds_name, const double digit);
+
+/* Device send data to OneNET cloud. */
+int onenet_http_upload_digit(const char *ds_name, const double digit);
+int onenet_http_upload_string(const char *ds_name, const char *str);
+
+#ifdef ONENET_USING_AUTO_REGISTER
+/* Register a device to OneNET cloud. */
+int onenet_http_register_device(const char *dev_name, const char *auth_info);
+#endif
+
+/* get a datastream from OneNET cloud. */
+int onenet_http_get_datastream(const char *ds_name, struct rt_onenet_ds_info *datastream);
+/* get datapoints from OneNET cloud. Returned cJSON need to be free when user finished using the data. */
+cJSON *onenet_get_dp_by_limit(char *ds_name, size_t limit);
+cJSON *onenet_get_dp_by_start_end(char *ds_name, uint32_t start, uint32_t end, size_t limit);
+cJSON *onenet_get_dp_by_start_duration(char *ds_name, uint32_t start, size_t duration, size_t limit);
+/* Set the command response callback function. User needs to malloc memory for response data. */
+void onenet_set_cmd_rsp_cb(void(*cmd_rsp_cb)(uint8_t *recv_data, size_t recv_size, uint8_t **resp_data, size_t *resp_size));
+
+/* ========================== User port function ============================ */
+#ifdef ONENET_USING_AUTO_REGISTER
+/* Save device info. */
+int onenet_port_save_device_info(char *dev_id, char *api_key);
+/* Get device name and auth info for register. */
+int onenet_port_get_register_info(char *dev_name, char *auth_info);
+/* Get device info. */
+int onenet_port_get_device_info(char *dev_id, char *api_key, char *auth_info);
+/* Check the device has been registered or not. */
+int onenet_port_is_registed(void);
+#endif
+
+#endif /* _ONENET_H_ */
+</file>
+
+<file path="DAYU200_HI3861_ZNNY/random.c">
+#include "stdlib.h"
+#include <time.h>
+#include "random.h"
+
+unsigned int Myrandom(int MIN,int MAX)
+{
+    time_t t = time(NULL);
+    unsigned int seed = (unsigned int)t;
+    unsigned int rnd;
+    srand(seed); /* seed是一个种子数值，可以使用当前时间戳等 */
+    rnd=rand()%(MAX+1-MIN)+MIN;
+    return rnd;
+}
+</file>
+
+<file path="DAYU200_HI3861_ZNNY/random.h">
+#ifndef RANDOM_H
+#define RANDOM_H
+
+unsigned int Myrandom(int MIN,int MAX);
+
+#endif /* RANDOM_H */
+</file>
+
+<file path="DAYU200_HI3861_ZNNY/tcp_test.c">
+#include <errno.h> // 包含错误号定义
+#include "hi_wifi_api.h" // 包含WiFi API
+#include "lwip/ip_addr.h" // 包含IP地址处理
+#include "lwip/netifapi.h" // 包含网络接口API
+#include "lwip/sockets.h" // 包含socket操作
+#include <stdio.h> // 包含标准输入输出
+
+#include <unistd.h> // 包含POSIX操作系统API
+#include "ohos_init.h" // 包含操作系统初始化
+#include "cmsis_os2.h" // 包含CMSIS-RTOS API
+
+
+static char request[128] = ""; // 定义请求缓冲区
+
+unsigned short port = 3861; // 定义服务器监听端口
+
+int sockfd ; // TCP socket文件描述符
+int connfd = -1; // 连接文件描述符
+
+// TCP服务器测试函数
+void TcpServerTest(void *pdata)
+{
+    ssize_t retval = 0; // 定义返回值变量
+    int backlog = 1; // 定义监听队列长度
+    sockfd = socket(AF_INET, SOCK_STREAM, 0); // 创建TCP socket
+    connfd = -1; // 初始化连接文件描述符
+
+    struct sockaddr_in clientAddr = {0}; // 定义客户端地址结构
+    socklen_t clientAddrLen = sizeof(clientAddr); // 客户端地址长度
+    struct sockaddr_in serverAddr = {"192.168.84.188"}; // 定义服务器地址结构
+    serverAddr.sin_family = AF_INET; // 地址族
+    serverAddr.sin_port = htons(port);  // 将端口号转换为网络字节序
+    serverAddr.sin_addr.s_addr = htonl(INADDR_ANY); // 监听所有接口
+
+    retval = bind(sockfd, (struct sockaddr *)&serverAddr, sizeof(serverAddr)); // 绑定socket到地址
+    if (retval < 0) {
+        printf("bind failed, %ld!\r\n", retval);
+        goto do_cleanup; // 绑定失败，跳转到清理标签
+    }
+    printf("bind to port %d success!\r\n", port); // 绑定成功，打印信息
+
+    retval = listen(sockfd, backlog); // 开始监听
+    if (retval < 0) {
+        printf("listen failed!\r\n");
+        goto do_cleanup; // 监听失败，跳转到清理标签
+    }
+    printf("listen with %d backlog success!\r\n", backlog); // 监听成功，打印信息
+
+    while(1)
+    {
+        // 循环等待客户端连接
+        connfd = accept(sockfd, (struct sockaddr *)&clientAddr, &clientAddrLen);
+        if (connfd < 0) {
+            printf("accept failed, %d, %d\r\n", connfd, errno);
+            goto do_cleanup; // 接受连接失败，跳转到清理标签
+        }
+        printf("accept success, connfd = %d!\r\n", connfd); // 接受连接成功，打印信息
+        printf("client addr info: host = %s, port = %d\r\n", inet_ntoa(clientAddr.sin_addr), ntohs(clientAddr.sin_port)); // 打印客户端地址信息
+        
+        while(1)
+        {
+            // 循环接收客户端请求
+            retval = recv(connfd, request, sizeof(request), 0);
+            if (retval < 0) {
+                printf("recv request failed, %ld!\r\n", retval);
+                goto do_disconnect; // 接收请求失败，跳转到断开连接标签
+            }
+
+            // 根据接收到的请求控制开关
+            if(memcmp(request, "switch1:on", strlen("switch1:on")) == 0)
+            {
+                printf("____>>>>>>>switch1:on\r\n");
+                jd_switch(1, 1); // 控制switch1打开
+            }
+
+            if(memcmp(request, "switch1:off", strlen("switch1:off")) == 0)
+            {
+                printf("____>>>>>>>switch1:off\r\n");
+                jd_switch(1, 0); // 控制switch1关闭
+            }
+
+            if(memcmp(request, "switch2:on", strlen("switch2:on")) == 0)
+            {
+                printf("____>>>>>>>switch2:on\r\n");
+                jd_switch(2, 1); // 控制switch2打开
+            }
+
+            if(memcmp(request, "switch2:off", strlen("switch2:off")) == 0)
+            {
+                printf("____>>>>>>>switch2:off\r\n");
+                jd_switch(2, 0); // 控制switch2关闭
+            }
+
+            printf("recv request{%s} from client done!\r\n", request); // 打印接收到的请求
+        }
+
+do_disconnect: // 断开连接标签
+        connfd = -1; // 重置连接文件描述符
+        printf("do_disconnect \r\n");
+        sleep(1); // 等待1秒
+        close(connfd); // 关闭连接
+        sleep(1); // 调试用的等待
+
+do_cleanup: // 清理标签
+        printf("do_cleanup...\r\n");
+        close(sockfd); // 关闭socket
+    }
+}
+
+// 发送TCP响应函数
+void send_tcp_gb(char *buf, int len)
+{
+    ssize_t retval = 0;
+
+    if(connfd == -1)
+    {
+        // 如果没有连接，直接返回
+        return ;
+    }
+
+    retval = send(connfd, buf, len, 0); // 发送响应
+    if (retval <= 0) {
+        printf("send response failed, %ld!\r\n", retval);
+    }
+    printf("send response{%s} to client done!\r\n", buf); // 打印发送的响应
+}
+
+// 启动TCP线程函数
+void start_tcp_thread(void)
+{
+    osThreadAttr_t attr; // 定义线程属性
+
+    attr.name = "TcpServerTest"; // 线程名称
+    attr.attr_bits = 0U; // 属性位
+    attr.cb_mem = NULL; // 回调内存
+    attr.cb_size = 0U; // 回调大小
+    attr.stack_mem = NULL; // 栈内存
+    attr.stack_size = 2048; // 栈大小
+    attr.priority = 36; // 线程优先级
+
+    // 创建线程
+    if (osThreadNew((osThreadFunc_t)TcpServerTest, NULL, &attr) == NULL) {
+        printf("[TcpServerTest] Falied to create LedTask!\n"); // 创建线程失败，打印错误信息
+    }
+}
+</file>
+
+<file path="DAYU200_HI3861_ZNNY/udp_test.c">
+#include "hi_wifi_api.h"
+#include "lwip/ip_addr.h"
+#include "lwip/netifapi.h"
+#include "lwip/sockets.h"
+#include <stdio.h>
+
+#include <unistd.h>
+#include "ohos_init.h"
+#include "cmsis_os2.h"
+#include "cJSON.h"
+
+#include "zhjt.h"
+
+#define SERVER_PORT 3862
+
+
+unsigned char recvline[1024];
+
+static int sockfd;
+
+struct sockaddr_in servaddr;
+
+struct sockaddr_in servaddr_ytj;
+
+void printf_hex(char *buf, int len)
+{
+	int i;
+	for(i = 0; i < len; i++)
+	{
+		printf("%2x ", buf[i]);
+	}
+	printf("\r\n");
+}
+
+void udp_socket_init(void)
+{
+    int ret;
+    cJSON *recvjson;
+
+
+    sockfd = socket(PF_INET, SOCK_DGRAM, 0);
+ 
+    //鏈嶅姟鍣? ip port
+    bzero(&servaddr, sizeof(servaddr));
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    servaddr.sin_port = htons(SERVER_PORT);
+
+    printf("udp_thread \r\n");
+    bind(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr));
+
+    //开启广播功能
+    int opt= 1;
+    ret = setsockopt(sockfd,SOL_SOCKET,SO_BROADCAST,&opt,sizeof(opt)); 
+
+    //设置广播地址
+    bzero(&servaddr,sizeof(servaddr));
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_port = htons(SERVER_PORT);
+    servaddr.sin_addr.s_addr = inet_addr("255.255.255.255");
+
+}
+
+extern unsigned int gz_val;
+
+void udp_thread(void *pdata)
+{
+    int ret;
+    cJSON *recvjson;
+
+    pdata = pdata;
+
+
+    while(1)
+    {
+        struct sockaddr_in addrClient;
+        int sizeClientAddr = sizeof(struct sockaddr_in);
+
+        memset(recvline, sizeof(recvline), 0);
+        ret = recvfrom(sockfd, recvline, 1024, 0, (struct sockaddr*)&addrClient,(socklen_t*)&sizeClientAddr);
+        
+        if(ret>0)
+        {
+            char *pClientIP =inet_ntoa(addrClient.sin_addr);
+ 
+            //把对方的IP地址打印出来
+            printf("%s-%d(%d) says:\n",pClientIP,ntohs(addrClient.sin_port),addrClient.sin_port);
+
+            printf_hex(recvline, ret);
+
+            if(recvline[0] == 0x85)
+            {
+                printf("recvline[0] == 0x85 \r\n");
+                //光照
+                if(recvline[1] == EVENT_GZ)
+                {
+                    gz_val = (recvline[2]<<8) | recvline[3];
+                    printf("EVENT_GZ %ld\r\n", gz_val);
+                }
+            }
+		}
+    }
+}
+
+void send_udp_gb(char *buf, int len)
+{
+    ssize_t retval = 0;
+    retval = sendto(sockfd, buf, len, 0, (struct sockaddr *)&servaddr,sizeof(servaddr));
+    if (retval < 0) {
+        printf("sendto failed!\r\n");
+    }
+    printf("send UDP message {%s} %ld done!\r\n", buf, len);
+}
+
+
+void start_udp_thread(void)
+{
+    osThreadAttr_t attr;
+
+    attr.name = "wifi_config_thread";
+    attr.attr_bits = 0U;
+    attr.cb_mem = NULL;
+    attr.cb_size = 0U;
+    attr.stack_mem = NULL;
+    attr.stack_size = 2048;
+    attr.priority = 36;
+
+    if (osThreadNew((osThreadFunc_t)udp_thread, NULL, &attr) == NULL) {
+        printf("[LedExample] Falied to create LedTask!\n");
+    }
+}
+</file>
+
+<file path="DAYU200_HI3861_ZNNY/zhjt.h">
+#ifndef __ZHJT_H__
+#define __ZHJT_H__
+
+
+#define EVENT_GZ        1   
+#define EVENT_JDQ       2  
+
+#endif
+</file>
+
+<file path="SmartAgriculture/entry/src/main/ets/FormAbility/form.ts">
+import formBindingData from '@ohos.application.formBindingData';
+import formInfo from '@ohos.application.formInfo';
+
+export default {
+    onCreate(want) {
+        // Called to return a FormBindingData object.
+        let formData = {};
+        return formBindingData.createFormBindingData(formData);
+    },
+
+    onCastToNormal(formId) {
+        // Called when the form provider is notified that a temporary form is successfully
+        // converted to a normal form.
+    },
+
+    onUpdate(formId) {
+        // Called to notify the form provider to update a specified form.
+    },
+
+    onVisibilityChange(newStatus) {
+        // Called when the form provider receives form events from the system.
+    },
+
+    onEvent(formId, message) {
+        // Called when a specified message event defined by the form provider is triggered.
+    },
+
+    onDestroy(formId) {
+        // Called to notify the form provider that a specified form has been destroyed.
+    },
+
+    onAcquireFormState(want) {
+        // Called to return a {@link FormState} object.
+        return formInfo.FormState.READY;
+    }
+};
+</file>
+
+<file path="SmartAgriculture/entry/src/main/ets/MainAbility/pages/common/utils/time.ets">
+/*
+ * Copyright (c) 2022 JianGuo Device Co., Ltd.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+/**
+ * @ProjectName : SmartAgriculture
+ * @FileName : time
+ * @Author : 坚果
+ * @Time : 2022/12/5 17:30
+ * @Description : 文件描述
+ */
+/*
+ * Copyright (c) 2022 JianGuo Device Co., Ltd.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+/**
+ * @ProjectName : CloudCommunity
+ * @FileName : time
+ * @Author : 坚果
+ * @Time : 2022/10/10 15:15
+ * @Description : 时间
+ */
+import featureAbility from '@ohos.ability.featureAbility';
+import wantConstant from '@ohos.ability.wantConstant';
+
+let date = new Date
+
+export function getFullYear(): string {
+  return date.getFullYear() + '年'
+}
+
+export function getDate(): string {
+  return date.getMonth() + 1 + '月' + date.getDate() + '日'
+}
+
+export function getTime(): string {
+  return (date.getHours() < 10 ? '0' + date.getHours() : date.getHours()) + ':' + (date.getMinutes() < 10 ? '0' + date.getMinutes() : date.getMinutes())
+}
+
+export function getSeconds(): string {
+  return ':' + (date.getSeconds() < 10 ? '0' + date.getSeconds() : date.getSeconds())
+}
+
+export function toTime(Number: number): string {
+  let hour: number
+  let minute: number
+  let second: number
+  hour = Number / 3600 | 0
+  minute = Number / 60 % 60 | 0
+  second = Number % 60 | 0
+  if (hour > 0) {
+    return (hour < 10 ? '0' + hour : hour.toString()) + ":" + (minute < 10 ? '0' + minute : minute.toString()) + ":" + (second < 10 ? '0' + second : second.toString())
+  } else {
+    return (minute < 10 ? '0' + minute : minute.toString()) + ":" + (second < 10 ? '0' + second : second.toString())
+  }
+}
+
+/**
+ * 拉起远程设备
+ */
+export function startRemoteAbilities(deviceIds, videosId) {
+  for (var i = 0; i < deviceIds.length; i++) {
+    var want = {
+      "want": {
+        "deviceId": deviceIds[i],
+        "bundleName": "com.jianguo.myapplication",
+        "abilityName": "com.jianguo.myapplication.MainAbility",
+        // 分布式任务flag
+        "flags": wantConstant.Flags.FLAG_ABILITYSLICE_MULTI_DEVICE,
+        "parameters": {
+          // 指定跳转的页面
+          "url": 'pages/index',
+          // 跳转携带的参数
+          "videosId": videosId
+        },
+      }
+    };
+    featureAbility.startAbility(want, (err, data) => {
+      if (err) {
+        console.error('startRemoteAbility err:' + JSON.stringify(err));
+        return;
+      }
+      console.info('startRemoteAbility successful. Data: ' + JSON.stringify(data))
+    });
+  }
+}
+</file>
+
+<file path="SmartAgriculture/entry/src/main/ets/MainAbility/pages/common/optionItem.ets">
+/*
+ * Copyright (c) 2022 JianGuo Device Co., Ltd.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+/**
+ * @ProjectName : SmartAgriculture
+ * @FileName : optionItem
+ * @Author : 坚果
+ * @Time : 2022/12/5 16:38
+ * @Description :
+ */
+
+
+/*
+ * Copyright (c) 2021 JianGuo Device Co., Ltd.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/**
+ * 该组件为设置和其他类似UI的选项布局。
+ * 主要内容为图片+文字+导航箭头
+
+ */
+
+
+
+@Component
+export struct optionItem {
+  @State bgColor: Resource = $r("app.color.white")
+  private img: Resource //图标资源
+  private context: string //文字内容
+  private isNext: boolean //是否有下一步的导航箭头
+  private marginTop: string = "100%" //组件上边距
+
+  private itemOnClick = (event: ClickEvent) => {
+  } //item的单击事件（可选）
+
+  build() {
+    Row() {
+      if (this.img != null) {
+        Flex({ direction: FlexDirection.Row, alignItems: ItemAlign.Center, justifyContent: FlexAlign.Center }) {
+          Image(this.img)
+            .width(30).height(30)
+        }.width(50).height(60)
+      }
+      Column() {
+        Row() {
+          Text(this.context)
+            .fontFamily($r('sys.float.ohos_id_text_size_body1'))
+            .fontSize(19)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .maxLines(1)
+            .layoutWeight(1)
+          //.margin({left: 10})
+          if (this.isNext == true) {
+            Image($r('app.media.icon_next'))
+              .width(18)
+              .height(18)
+              .margin(10)
+          }
+        }.height(59)
+
+        Divider().color($r('app.color.grey2')).strokeWidth(0.8)
+      }
+      .padding({ left: 10, right: 4 })
+      .height(60)
+      .layoutWeight(1)
+    }
+    .width('100%')
+    .height(60)
+    .margin({ top: this.marginTop })
+    .backgroundColor(this.bgColor)
+    .onTouch((event: TouchEvent) => {
+      if (event.type === TouchType.Down) {
+        this.bgColor = $r('app.color.grey2')
+      }
+      if (event.type === TouchType.Up) {
+        this.bgColor = $r('app.color.white')
+      }
+    })
+    .onClick((event: ClickEvent) => {
+      this.itemOnClick(event)
+    })
+  }
+}
+
+@Component
+export struct ClickText {
+  @State bgColor: Resource = $r("app.color.blue_link")
+  private img: Resource = $r("app.media.sun") //图标资源
+  private context: string //文字内容
+  private width: string = "30%" //组件上边距
+  //  private marginTop: number   //组件上边距
+
+  private itemOnClick = (event: ClickEvent) => {
+  } //item的单击事件（可选）
+
+  build() {
+    Column() {
+      Row() {
+        Image(this.img)
+          .width(30).height(30)
+        Blank()
+        Text(this.context)
+          .fontFamily($r('sys.float.ohos_id_text_size_body1'))
+          .fontSize(19)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .maxLines(1)
+
+
+      }.justifyContent(FlexAlign.Center)
+      .layoutWeight(1)
+    }
+    .width(this.width)
+    .height(60)
+    .border(
+      { width: 5 }
+    )
+
+    .backgroundColor(this.bgColor)
+    .onTouch((event: TouchEvent) => {
+      if (event.type === TouchType.Down) {
+        this.bgColor = $r('app.color.emui4')
+      }
+      if (event.type === TouchType.Up) {
+        this.bgColor = $r('app.color.blue_link')
+      }
+    })
+    .onClick((event: ClickEvent) => {
+      this.itemOnClick(event)
+    })
+  }
+}
+
+@Component
+export struct TextRow {
+  @State text: string = ''
+  @State value: string = ''
+
+  build() {
+    Row() {
+      Column() {
+        Text(this.text)
+          .fontSize(16)
+          .fontColor(Color.White)
+      }.width('32%')
+
+      Column() {
+        Text(this.value)
+          .fontSize(16)
+          .fontColor(Color.White)
+      }.width('32%')
+    }
+  }
+}
+</file>
+
+<file path="SmartAgriculture/entry/src/main/ets/MainAbility/pages/index.ets">
+import router from '@ohos.router';
+import prompt from '@ohos.prompt';
+import { getDate } from './common/utils/time';
+import { getFullYear } from './common/utils/time';
+import { getSeconds } from './common/utils/time';
+import { getTime } from './common/utils/time';
+import { TextRow } from './common/optionItem';
+import { ClickText } from './common/optionItem';
+
+import wifi from '@ohos.wifi';
+import socket from '@ohos.net.socket';
+
+//tcp连接对象
+let tcp = socket.constructTCPSocketInstance();
+//目标地址和端口
+let targetAddr = {
+  address: '192.168.84.58', //要通信的地址，3861
+  family: 1,
+  port: 3861 //
+}
+
+enum MSG_CMD {
+  Switch1_ON= "{\"switch1\":\"on\", }", //移动
+
+
+  Switch1_OFF= "{\"switch2\":\"off\", }", //移动
+  Switch2_ON = "{\"switch2\":\"on\", }", //移动
+  Switch2_OFF= "{\"switch2\":\"off\", }", //移动
+
+};
+@Entry
+@Component
+struct Index {
+  @State message: string = 'Hello World'
+  private tabSrc: Resource[] = [$r("app.media.zhny1"), $r("app.media.zhny2"), $r("app.media.zhny3"), $r("app.media.zhny4")]
+  private swiperController: SwiperController = new SwiperController()
+  @State currentDate: string = getFullYear() + getDate()
+  @State currentTime: string = getTime() + getSeconds()
+  @State temp: string = "22.60"
+  @State humi: string = "32.82"
+  //  @State mc1: string = "1"
+  //  @State mc2: string = "1"
+  //  @State rt1: string = "1"
+  @State isNight: boolean = false
+  quality: string = '优'
+  @State message_send: string = '{"temp":32.27,"humi":32.27,"rt1":1,"mc1":1,"mc2":1}'
+  @State message_recv: string = ''
+  @State status: string = '未连接'
+
+  private attendanceOnClick1ON=(event: ClickEvent)=> {
+    this.message_send = MSG_CMD.Switch1_ON
+    this.tcpSend()
+  }
+
+  private attendanceOnClick1Off=(event: ClickEvent)=> {
+    this.message_send = MSG_CMD.Switch1_OFF
+    this.tcpSend()
+  }
+
+  private attendanceOnClick2ON=(event: ClickEvent)=> {
+    this.message_send = MSG_CMD.Switch2_ON
+    this.tcpSend()
+  }
+
+  private attendanceOnClick2Off=(event: ClickEvent)=> {
+    this.message_send = MSG_CMD.Switch2_OFF
+    this.tcpSend()
+  }
+
+  onPageShow() {
+    //    this.tcpConnect()
+    setInterval(() => {
+      let date = new Date
+      // 判断是否为夜晚
+      this.isNight = date.getHours() >= 22 ? true : false
+      // 获取当前时间
+      this.currentTime = (date.getHours() < 10 ? '0' + date.getHours() : date.getHours()) + ':' + (date.getMinutes() < 10 ? '0' + date.getMinutes() : date.getMinutes()) + ':' + (date.getSeconds() < 10 ? '0' + date.getSeconds() : date.getSeconds())
+      // 判断是否为新的一天
+      if (date.getHours() == 0) {
+        this.currentDate = date.getFullYear() + '年' + (date.getMonth() + 1) + '月' + date.getDate() + '日'
+      }
+    }, 1000)
+  }
+
+  aboutToAppear() {
+    this.tcpConnect()
+  }
+
+  aboutToDisappear() {
+    this.tcpClose()
+  }
+  //本地地址和端口
+  localAddr = {
+    address: this.resolveIP(wifi.getIpInfo().ipAddress)
+  }
+
+  //解析本地IP,需要声明ohos.permission.GET_WIFI_INFO权限
+  resolveIP(ip) {
+    if (ip < 0 || ip > 0xFFFFFFFF) {
+      throw ("The number is not normal!");
+    }
+    return (ip >>> 24) + "." + (ip >> 16 & 0xFF) + "." + (ip >> 8 & 0xFF) + "." + (ip & 0xFF);
+  }
+  //解析ArrayBuffer
+  resolveArrayBuffer(message: ArrayBuffer): string {
+    if (message instanceof ArrayBuffer) {
+      let dataView = new DataView(message)
+      console.info(`length ${dataView.byteLength}`)
+      let str = ""
+      for (let i = 0;i < dataView.byteLength; ++i) {
+        let c = String.fromCharCode(dataView.getUint8(i))
+        if (c !== "\n") {
+          str += c
+        }
+      }
+      console.info(`message aray buffer:${str}`)
+      return str;
+    }
+  }
+  //初始化
+  tcpInit() {
+    tcp.on('connect', () => {
+      this.status = '已连接'
+      console.info("on tcp connect success");
+    });
+    tcp.on('message', value => {
+      this.message_recv = this.resolveArrayBuffer(value.message)
+      var temp = "temp";
+      var humi = "humi";
+      if (this.message_recv.includes(temp)) {
+
+        this.temp = this.message_recv.slice(5, 10);
+        console.log("==收到消息温度" + this.message_recv.slice(5, 10))
+      }
+      if (this.message_recv.includes(humi)) {
+
+        this.humi = this.message_recv.slice(5, 10);
+        console.log("==收到消息湿度" + this.message_recv.slice(5, 10))
+      }
+      if (this.message_recv.includes("mc1")) {
+        let mc1 = this.message_recv.slice(4, 5);
+
+        //        this.mc1 = this.message_recv.slice(4, 5);
+        console.log("==收到消息门禁1" + this.message_recv.slice(4, 5))
+      }
+      if (this.message_recv.includes("mc2")) {
+
+        //        this.mc2 = this.message_recv.slice(4, 5);
+        console.log("==收到消息门禁2" + this.message_recv.slice(4, 5))
+      }
+      if (this.message_recv.includes("rt1")) {
+
+        //        this.rt1 = this.message_recv.slice(4, 5);
+        console.log("==收到消息有人经过" + this.message_recv.slice(4, 5))
+      }
+
+      console.log("==收到消息:" + this.message_recv)
+
+
+    });
+    tcp.on('close', () => {
+      console.info(" ==收到 on tcp close success");
+    });
+
+    //bind本地地址
+    tcp.bind({ address: this.localAddr.address, port: 3861, family: 1 })
+      .then(() => {
+        console.info(` ==收到 bind tcp success`);
+      }).catch(err => {
+      console.info(` ==收到 bind tcp failed ${err}`);
+      return
+    });
+  }
+  //tcp 连接
+  tcpConnect() {
+    tcp.getState()
+      .then((data) => {
+        console.info(`====${JSON.stringify(data)}`)
+        if (data.isClose) {
+          this.tcpInit()
+        }
+
+        //开始连接
+        tcp.connect(
+          {
+            address: { address: targetAddr.address, port: 3861, family: 1 }, timeout: 6000
+          }
+        ).then(() => {
+          console.info(` ==收到 connect success`);
+
+        }).catch((error) => {
+          console.info(` ==收到 connect failed ${JSON.stringify(error)}`);
+        })
+
+      })
+  }
+
+  tcpSend() {
+    //查看状态
+    tcp.getState().then((data) => {
+      console.info(`====${JSON.stringify(data)}`)
+      //已连接,就发送数据
+      if (data.isConnected) {
+        //发送消息
+        tcp.send(
+          { data: this.message_send, }
+        ).then(() => {
+          prompt.showToast({ message: "数据发送成功" + this.message_send })
+        }).catch((error) => {
+          prompt.showToast({ message: `send failed ${JSON.stringify(error)}` })
+
+        })
+      } else {
+        prompt.showToast({ message: "not connect" })
+
+      }
+    })
+  }
+
+  tcpClose() {
+    tcp.close().then(() => {
+      this.status = '已断开'
+      console.info(`tcp.close success`)
+    }).catch((err) => {
+      console.info(`tcp.close error:${JSON.stringify(err)}`)
+    })
+    tcp.off('close');
+    tcp.off('message');
+    tcp.off('connect');
+  }
+
+  build() {
+    Row() {
+
+
+      Column() {
+        //温度，湿度，光照强度，土壤湿度，
+        Text("智慧农业系统")
+          .fontSize(36)
+          .fontWeight(FontWeight.Bold)
+        //当地温度
+        Column() {
+          Row() {
+            if (this.isNight) {
+              Image($r('app.media.moon'))
+                .width(100)
+                .height(100)
+                .objectFit(ImageFit.None)
+            } else {
+              Image($r('app.media.sun'))
+                .width(100)
+                .height(100)
+                .objectFit(ImageFit.None)
+            }
+            Text(this.currentDate + '\n' + this.currentTime)
+              .fontSize(24)
+              .fontColor(Color.White)
+          }
+
+          TextRow({ text: '温度', value: this.temp + '℃' })
+          TextRow({ text: '空气质量', value: this.quality })
+          TextRow({ text: '空气湿度', value: this.humi + "%RH" })
+        }
+        .onAppear(() => {
+          //          this.tcpConnect()
+        })
+        .onClick(() => {
+          //          this.tcpConnect()
+        })
+        .width("90%")
+        .borderRadius(30)
+        .backgroundColor($r('app.color.blue_link'))
+        .margin(20)
+        //视频监控
+        Swiper(this.swiperController) {
+          ForEach(this.tabSrc, (item) => {
+            Image(item).width('90%').height("30%").backgroundColor(0xAFEEEE)
+          },)
+        }
+        .cachedCount(2)
+        .index(1)
+        .autoPlay(true)
+        .interval(4000)
+        .indicator(true) // 默认开启指示点
+        .loop(true) // 默认开启循环播放
+        .duration(1000)
+        .vertical(false) // 默认横向切换
+        .itemSpace(0)
+        .curve(Curve.Linear) // 动画曲线
+        .onChange((index: number) => {
+          console.info(index.toString())
+        })
+        .margin(10)
+        //控制区域
+        Flex({ wrap: FlexWrap.Wrap, direction: FlexDirection.Row }) {
+          ClickText({ context: "通风", itemOnClick: this.attendanceOnClick1ON })
+          ClickText({ context: "浇水", itemOnClick: this.attendanceOnClick1Off })
+          ClickText({ context: "施肥", itemOnClick: this.attendanceOnClick2ON })
+          ClickText({ context: "补光", width: "100%", itemOnClick: this.attendanceOnClick2Off })
+        }
+        //控制区域，通风，浇水，补光，施肥
+        //        this.message_send = MSG_CMD.MOVE_GO
+        //        this.tcpSend()
+
+      }
+      .width('100%')
+    }
+    .height('100%')
+  }
+}
+</file>
+
+<file path="SmartAgriculture/entry/src/main/ets/MainAbility/app.ets">
+import hilog from '@ohos.hilog';
+
+export default {
+  onCreate() {
+    hilog.isLoggable(0x0000, 'testTag', hilog.LogLevel.INFO);
+    hilog.info(0x0000, 'testTag', '%{public}s', 'Application onCreate');
+  },
+  onDestroy() {
+    hilog.isLoggable(0x0000, 'testTag', hilog.LogLevel.INFO);
+    hilog.info(0x0000, 'testTag', '%{public}s', 'Application onDestroy');
+  },
+}
+</file>
+
+<file path="SmartAgriculture/entry/src/main/js/widget/i18n/en-US.json">
+{
+  "strings": {
+    "title_immersive": "Today's delicious food",
+    "detail_immersive": "A bowl of fragrant fried noodles, back to childhood memories"
+  }
+}
+</file>
+
+<file path="SmartAgriculture/entry/src/main/js/widget/i18n/zh-CN.json">
+{
+  "strings": {
+    "title_immersive": "今日美食推荐",
+    "detail_immersive": "一碗香喷喷的炸酱面，回到儿时的青涩回忆"
+  }
+}
+</file>
+
+<file path="SmartAgriculture/entry/src/main/js/widget/pages/index/index.css">
+.container {
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.bg-img {
+    flex-shrink: 0;
+    height: 100%;
+}
+
+.container-inner {
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: flex-start;
+    height: 100%;
+    width: 100%;
+    padding: 12px;
+}
+
+.title {
+    font-size: 19px;
+    font-weight: bold;
+    color: white;
+    text-overflow: ellipsis;
+    max-lines: 1;
+}
+
+.detail_text {
+    font-size: 16px;
+    color: white;
+    opacity: 0.66;
+    text-overflow: ellipsis;
+    max-lines: 1;
+    margin-top: 6px;
+}
+
+@media (device-type: wearable) {
+    .container-inner {
+        justify-content: center;
+        align-items: center;
+        padding: 40px 26px;
+    }
+
+    .title {
+        text-align: center;
+    }
+
+    .detail_text {
+        max-lines: 2;
+        text-align: center;
+    }
+}
+
+@media (device-type: tv) {
+    .title {
+        font-size: 16px;
+    }
+
+    .detail_text {
+        font-size: 12px;
+    }
+}
+
+@media (device-type: car) {
+    .title {
+        font-size: 12px;
+        color: #FFFFFF;
+        font-family: @id_text_font_family_medium;
+    }
+
+    .detail_text {
+        font-size: 12px;
+        margin-top: 2px;
+        font-family: @id_text_font_family_regular;
+        color: #FFFFFF;
+    }
+}
+</file>
+
+<file path="SmartAgriculture/entry/src/main/js/widget/pages/index/index.hml">
+<div class="container" onclick="routerEvent">
+    <stack>
+        <div class="container-img">
+            <image src="/common/widget.png" class="bg-img"></image>
+        </div>
+        <div class="container-inner">
+            <text class="title">{{ $t('strings.title_immersive') }}</text>
+            <text class="detail_text">{{ $t('strings.detail_immersive') }}</text>
+        </div>
+    </stack>
+</div>
+</file>
+
+<file path="SmartAgriculture/entry/src/main/js/widget/pages/index/index.json">
+{
+  "data": {
+    "title": "Title",
+    "detail": "Text"
+  },
+  "actions": {
+    "routerEvent": {
+      "action": "router",
+      "abilityName": "com.example.smartagriculture.MainAbility",
+      "params": {
+        "message": "add detail"
+      }
+    }
+  }
+}
+</file>
+
+<file path="SmartAgriculture/entry/src/main/resources/base/element/color.json">
+{
+  "color": [
+    {
+      "name": "green0",
+      "value": "#57BE6E"
+    },
+    {
+      "name": "green1",
+      "value": "#95EC72"
+    },
+    {
+      "name": "grey0",
+      "value": "#EDEDED"
+    },
+    {
+      "name": "grey1",
+      "value": "#F7F7F7"
+    },
+    {
+      "name": "grey2",
+      "value": "#DBDBDB"
+    },
+    {
+      "name": "grey3",
+      "value": "#9E9E9E"
+    },
+    {
+      "name": "grey4",
+      "value": "#F7F7F7"
+    },
+    {
+      "name": "white",
+      "value": "#FFFFFF"
+    },
+    {
+      "name": "black",
+      "value": "#000000"
+    },
+    {
+      "name": "blue_link",
+      "value": "#60678B"
+    },
+    {
+      "name": "appBg",
+      "value": "#F1F3F5"
+    },
+    {
+      "name": "toastBg",
+      "value": "#F24D4D4D"
+    },
+    {
+      "name": "cardBg",
+      "value": "#FFFFFF"
+    },
+    {
+      "name": "danger",
+      "value": "#E84026"
+    },
+    {
+      "name": "warning",
+      "value": "#ED6F21"
+    },
+    {
+      "name": "success",
+      "value": "#64BB5C"
+    },
+    {
+      "name": "info",
+      "value": "#0A59F7"
+    },
+    {
+      "name": "controlBg",
+      "value": "#0C000000"
+    },
+    {
+      "name": "controlFg",
+      "value": "#000000"
+    },
+    {
+      "name": "controlBorder",
+      "value": "#254FF7"
+    },
+    {
+      "name": "controlFocusBg",
+      "value": "#FFFFFF"
+    },
+    {
+      "name": "controlFocusFg",
+      "value": "#000000"
+    },
+    {
+      "name": "controlFocusBorder",
+      "value": "#254FF7"
+    },
+    {
+      "name": "controlFocusBg2",
+      "value": "#66000000"
+    },
+    {
+      "name": "controlFocusBorder2",
+      "value": "#254FF7"
+    },
+    {
+      "name": "fgActived",
+      "value": "#0A59F7"
+    },
+    {
+      "name": "fgFocusActived",
+      "value": "#5291FF"
+    },
+    {
+      "name": "fgLevel1",
+      "value": "#000000"
+    },
+    {
+      "name": "fgFocusLevel1",
+      "value": "#FFFFFF"
+    },
+    {
+      "name": "fgLevel2",
+      "value": "#99000000"
+    },
+    {
+      "name": "fgFocusLevel2",
+      "value": "#99FFFFFF"
+    },
+    {
+      "name": "fgLevel3",
+      "value": "#66000000"
+    },
+    {
+      "name": "fgFocusLevel3",
+      "value": "#66FFFFFF"
+    },
+    {
+      "name": "fgLevel4",
+      "value": "#33000000"
+    },
+    {
+      "name": "fgFocusLevel4",
+      "value": "#33FFFFFF"
+    },
+    {
+      "name": "kbdFg",
+      "value": "#FFFFFF"
+    },
+    {
+      "name": "kbdBg",
+      "value": "#000000"
+    },
+    {
+      "name": "emui1",
+      "value": "#564AF7"
+    },
+    {
+      "name": "emui2",
+      "value": "#46B1E3"
+    },
+    {
+      "name": "emui3",
+      "value": "#61CFBE"
+    },
+    {
+      "name": "emui4",
+      "value": "#64BB5C"
+    },
+    {
+      "name": "emui5",
+      "value": "#A5D61D"
+    },
+    {
+      "name": "emui6",
+      "value": "#AC49F5"
+    },
+    {
+      "name": "emui7",
+      "value": "#E64566"
+    },
+    {
+      "name": "emui8",
+      "value": "#E84026"
+    },
+    {
+      "name": "emui9",
+      "value": "#ED6F21"
+    },
+    {
+      "name": "emui10",
+      "value": "#F9A01E"
+    },
+    {
+      "name": "emui11",
+      "value": "#F7CE00"
+    },
+    {
+      "name": "emuiLow1",
+      "value": "#8981F7"
+    },
+    {
+      "name": "emuiLow2",
+      "value": "#86C5E3"
+    },
+    {
+      "name": "emuiLow3",
+      "value": "#92D6CC"
+    },
+    {
+      "name": "emuiLow4",
+      "value": "#92C48D"
+    },
+    {
+      "name": "emuiLow5",
+      "value": "#BDDB69"
+    },
+    {
+      "name": "emuiLow6",
+      "value": "#C386F0"
+    },
+    {
+      "name": "emuiLow7",
+      "value": "#E67C92"
+    },
+    {
+      "name": "emuiLow8",
+      "value": "#E87361"
+    },
+    {
+      "name": "emuiLow9",
+      "value": "#ED955F"
+    },
+    {
+      "name": "emuiLow10",
+      "value": "#F9BC64"
+    },
+    {
+      "name": "emuiLow11",
+      "value": "#F5DC62"
+    },
+    {
+      "name": "morandi1",
+      "value": "#BBB2C8"
+    },
+    {
+      "name": "morandi2",
+      "value": "#B6C5D1"
+    },
+    {
+      "name": "morandi3",
+      "value": "#A6C2BE"
+    },
+    {
+      "name": "morandi4",
+      "value": "#B6C6B3"
+    },
+    {
+      "name": "morandi5",
+      "value": "#C1C8AC"
+    },
+    {
+      "name": "morandi6",
+      "value": "#C2B1C8"
+    },
+    {
+      "name": "morandi7",
+      "value": "#D1BFC5"
+    },
+    {
+      "name": "morandi8",
+      "value": "#CFB4B4"
+    },
+    {
+      "name": "morandi9",
+      "value": "#D4BFB8"
+    },
+    {
+      "name": "morandi10",
+      "value": "#D2C3B2"
+    },
+    {
+      "name": "morandi11",
+      "value": "#D2CAB3"
+    },
+    {
+      "name": "appBg_alpha",
+      "value": "#00FFFFFF"
+    },
+    {
+      "name": "toastBg_alpha",
+      "value": "#F24D4D4D"
+    },
+    {
+      "name": "cardBg_alpha",
+      "value": "#00FFFFFF"
+    },
+    {
+      "name": "danger_alpha",
+      "value": "#E84026"
+    },
+    {
+      "name": "warning_alpha",
+      "value": "#ED6F21"
+    },
+    {
+      "name": "success_alpha",
+      "value": "#64BB5C"
+    },
+    {
+      "name": "info_alpha",
+      "value": "#0A59F7"
+    },
+    {
+      "name": "controlBg_alpha",
+      "value": "#33FFFFFF"
+    },
+    {
+      "name": "controlFg_alpha",
+      "value": "#000000"
+    },
+    {
+      "name": "controlBorder_alpha",
+      "value": "#254FF7"
+    },
+    {
+      "name": "controlFocusBg_alpha",
+      "value": "#FFFFFF"
+    },
+    {
+      "name": "controlFocusFg_alpha",
+      "value": "#000000"
+    },
+    {
+      "name": "controlFocusBorder_alpha",
+      "value": "#254FF7"
+    },
+    {
+      "name": "controlFocusBg2_alpha",
+      "value": "#66000000"
+    },
+    {
+      "name": "controlFocusBorder2_alpha",
+      "value": "#254FF7"
+    },
+    {
+      "name": "fgActived_alpha",
+      "value": "#5291FF"
+    },
+    {
+      "name": "fgFocusActived_alpha",
+      "value": "#5291FF"
+    },
+    {
+      "name": "fgLevel1_alpha",
+      "value": "#FFFFFF"
+    },
+    {
+      "name": "fgFocusLevel1_alpha",
+      "value": "#FFFFFF"
+    },
+    {
+      "name": "fgLevel2_alpha",
+      "value": "#99FFFFFF"
+    },
+    {
+      "name": "fgFocusLevel2_alpha",
+      "value": "#99FFFFFF"
+    },
+    {
+      "name": "fgLevel3_alpha",
+      "value": "#66FFFFFF"
+    },
+    {
+      "name": "fgFocusLevel3_alpha",
+      "value": "#66FFFFFF"
+    },
+    {
+      "name": "fgLevel4_alpha",
+      "value": "#33FFFFFF"
+    },
+    {
+      "name": "fgFocusLevel4_alpha",
+      "value": "#33FFFFFF"
+    },
+    {
+      "name": "emui1_alpha",
+      "value": "#564AF7"
+    },
+    {
+      "name": "emui2_alpha",
+      "value": "#46B1E3"
+    },
+    {
+      "name": "emui3_alpha",
+      "value": "#61CFBE"
+    },
+    {
+      "name": "emui4_alpha",
+      "value": "#64BB5C"
+    },
+    {
+      "name": "emui5_alpha",
+      "value": "#A5D61D"
+    },
+    {
+      "name": "emui6_alpha",
+      "value": "#AC49F5"
+    },
+    {
+      "name": "emui7_alpha",
+      "value": "#E64566"
+    },
+    {
+      "name": "emui8_alpha",
+      "value": "#E84026"
+    },
+    {
+      "name": "emui9_alpha",
+      "value": "#ED6F21"
+    },
+    {
+      "name": "emui10_alpha",
+      "value": "#F9A01E"
+    },
+    {
+      "name": "emui11_alpha",
+      "value": "#F7CE00"
+    },
+    {
+      "name": "emuiLow1_alpha",
+      "value": "#8981F7"
+    },
+    {
+      "name": "emuiLow2_alpha",
+      "value": "#86C5E3"
+    },
+    {
+      "name": "emuiLow3_alpha",
+      "value": "#92D6CC"
+    },
+    {
+      "name": "emuiLow4_alpha",
+      "value": "#92C48D"
+    },
+    {
+      "name": "emuiLow5_alpha",
+      "value": "#BDDB69"
+    },
+    {
+      "name": "emuiLow6_alpha",
+      "value": "#C386F0"
+    },
+    {
+      "name": "emuiLow7_alpha",
+      "value": "#E67C92"
+    },
+    {
+      "name": "emuiLow8_alpha",
+      "value": "#E87361"
+    },
+    {
+      "name": "emuiLow9_alpha",
+      "value": "#ED955F"
+    },
+    {
+      "name": "emuiLow10_alpha",
+      "value": "#F9BC64"
+    },
+    {
+      "name": "emuiLow11_alpha",
+      "value": "#F5DC62"
+    },
+    {
+      "name": "morandi1_alpha",
+      "value": "#BBB2C8"
+    },
+    {
+      "name": "morandi2_alpha",
+      "value": "#B6C5D1"
+    },
+    {
+      "name": "morandi3_alpha",
+      "value": "#A6C2BE"
+    },
+    {
+      "name": "morandi4_alpha",
+      "value": "#B6C6B3"
+    },
+    {
+      "name": "morandi5_alpha",
+      "value": "#C1C8AC"
+    },
+    {
+      "name": "morandi6_alpha",
+      "value": "#C2B1C8"
+    },
+    {
+      "name": "morandi7_alpha",
+      "value": "#D1BFC5"
+    },
+    {
+      "name": "morandi8_alpha",
+      "value": "#CFB4B4"
+    },
+    {
+      "name": "morandi9_alpha",
+      "value": "#D4BFB8"
+    },
+    {
+      "name": "morandi10_alpha",
+      "value": "#D2C3B2"
+    },
+    {
+      "name": "morandi11_alpha",
+      "value": "#D2CAB3"
+    }
+  ]
+}
+</file>
+
+<file path="SmartAgriculture/entry/src/main/resources/base/element/string.json">
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "module description"
+    },
+    {
+      "name": "MainAbility_desc",
+      "value": "description"
+    },
+    {
+      "name": "MainAbility_label",
+      "value": "智慧农业"
+    },
+    {
+      "name": "FormAbility_desc",
+      "value": "form_description"
+    },
+    {
+      "name": "FormAbility_label",
+      "value": "form_label"
+    }
+  ]
+}
+</file>
+
+<file path="SmartAgriculture/entry/src/main/resources/en_US/element/string.json">
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "module description"
+    },
+    {
+      "name": "MainAbility_desc",
+      "value": "description"
+    },
+    {
+      "name": "MainAbility_label",
+      "value": "智慧农业"
+    },
+    {
+      "name": "FormAbility_desc",
+      "value": "form_description"
+    },
+    {
+      "name": "FormAbility_label",
+      "value": "form_label"
+    }
+  ]
+}
+</file>
+
+<file path="SmartAgriculture/entry/src/main/resources/zh_CN/element/string.json">
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "模块描述"
+    },
+    {
+      "name": "MainAbility_desc",
+      "value": "description"
+    },
+    {
+      "name": "MainAbility_label",
+      "value": "智慧农业"
+    },
+    {
+      "name": "FormAbility_desc",
+      "value": "form_description"
+    },
+    {
+      "name": "FormAbility_label",
+      "value": "form_label"
+    }
+  ]
+}
+</file>
+
+<file path="SmartAgriculture/entry/src/main/config.json">
+{
+  "app": {
+    "bundleName": "com.example.smartagriculture",
+    "vendor": "example",
+    "version": {
+      "code": 1000000,
+      "name": "1.0.0"
+    }
+  },
+  "deviceConfig": {},
+  "module": {
+    "package": "com.example.smartagriculture",
+    "name": ".entry",
+    "mainAbility": ".MainAbility",
+    "deviceType": [
+      "default",
+      "tablet"
+    ],
+    "distro": {
+      "deliveryWithInstall": true,
+      "moduleName": "entry",
+      "moduleType": "entry",
+      "installationFree": false
+    }, "reqPermissions": [
+      {
+        "name": "ohos.permission.INTERNET"
+      },
+      {
+        "name": "ohos.permission.MICROPHONE"
+      },
+      {
+        "name": "ohos.permission.MEDIA_LOCATION"
+      },
+      {
+        "name": "ohos.permission.WRITE_MEDIA"
+      },
+      {
+        "name": "ohos.permission.READ_MEDIA"
+      },
+      {
+        "name": "ohos.permission.GET_WIFI_INFO"
+      }
+    ],
+    "abilities": [
+      {
+        "skills": [
+          {
+            "entities": [
+              "entity.system.home"
+            ],
+            "actions": [
+              "action.system.home"
+            ]
+          }
+        ],
+        "orientation": "unspecified",
+        "formsEnabled": false,
+        "name": ".MainAbility",
+        "srcLanguage": "ets",
+        "srcPath": "MainAbility",
+        "icon": "$media:sun",
+        "description": "$string:MainAbility_label",
+        "label": "$string:MainAbility_label",
+        "type": "page",
+        "visible": true,
+        "launchType": "standard"
+      },
+      {
+        "name": ".FormAbility",
+        "srcPath": "FormAbility",
+        "description": "$string:FormAbility_desc",
+        "icon": "$media:icon",
+        "label": "$string:FormAbility_label",
+        "type": "service",
+        "formsEnabled": true,
+        "srcLanguage": "ets",
+        "forms": [
+          {
+            "jsComponentName": "widget",
+            "isDefault": true,
+            "scheduledUpdateTime": "10:30",
+            "defaultDimension": "2*2",
+            "name": "widget",
+            "description": "This is a service widget.",
+            "colorMode": "auto",
+            "type": "JS",
+            "formVisibleNotify": true,
+            "supportDimensions": [
+              "2*2",
+              "2*4",
+              "4*4"
+            ],
+            "updateEnabled": true,
+            "updateDuration": 1
+          }
+        ]
+      }
+    ],
+    "js": [
+      {
+        "mode": {
+          "syntax": "ets",
+          "type": "pageAbility"
+        },
+        "pages": [
+          "pages/index"
+        ],
+        "name": ".MainAbility",
+        "window": {
+          "designWidth": 720,
+          "autoDesignWidth": false
+        }
+      },
+      {
+        "name": "widget",
+        "pages": [
+          "pages/index/index"
+        ],
+        "window": {
+          "designWidth": 720,
+          "autoDesignWidth": true
+        },
+        "type": "form"
+      }
+    ]
+  }
+}
+</file>
+
+<file path="SmartAgriculture/entry/src/ohosTest/ets/test/Ability.test.ets">
+import hilog from '@ohos.hilog';
+import { describe, beforeAll, beforeEach, afterEach, afterAll, it, expect } from '@ohos/hypium'
+
+export default function abilityTest() {
+  describe('ActsAbilityTest', function () {
+    // Defines a test suite. Two parameters are supported: test suite name and test suite function.
+    beforeAll(function () {
+      // Presets an action, which is performed only once before all test cases of the test suite start.
+      // This API supports only one parameter: preset action function.
+    })
+    beforeEach(function () {
+      // Presets an action, which is performed before each unit test case starts.
+      // The number of execution times is the same as the number of test cases defined by **it**.
+      // This API supports only one parameter: preset action function.
+    })
+    afterEach(function () {
+      // Presets a clear action, which is performed after each unit test case ends.
+      // The number of execution times is the same as the number of test cases defined by **it**.
+      // This API supports only one parameter: clear action function.
+    })
+    afterAll(function () {
+      // Presets a clear action, which is performed after all test cases of the test suite end.
+      // This API supports only one parameter: clear action function.
+    })
+    it('assertContain',0, function () {
+      // Defines a test case. This API supports three parameters: test case name, filter parameter, and test case function.
+      hilog.isLoggable(0x0000, 'testTag', hilog.LogLevel.INFO);
+      hilog.info(0x0000, 'testTag', '%{public}s', 'it begin');
+      let a = 'abc'
+      let b = 'b'
+      // Defines a variety of assertion methods, which are used to declare expected boolean conditions.
+      expect(a).assertContain(b)
+      expect(a).assertEqual(a)
+    })
+  })
+}
+</file>
+
+<file path="SmartAgriculture/entry/src/ohosTest/ets/test/List.test.ets">
+import abilityTest from './Ability.test'
+
+export default function testsuite() {
+  abilityTest()
+}
+</file>
+
+<file path="SmartAgriculture/entry/src/ohosTest/ets/TestAbility/pages/index.ets">
+import hilog from '@ohos.hilog';
+
+@Entry
+@Component
+struct Index {
+  aboutToAppear() {
+          hilog.isLoggable(0x0000, 'testTag', hilog.LogLevel.INFO);
+          hilog.info(0x0000, 'testTag', '%{public}s', 'TestAbility index aboutToAppear');
+  }
+
+ @State message: string = 'Hello World'
+   build() {
+         Row() {
+           Column() {
+             Text(this.message)
+               .fontSize(50)
+               .fontWeight(FontWeight.Bold)
+             Button() {
+               Text('next page')
+                 .fontSize(20)
+                 .fontWeight(FontWeight.Bold)
+             }.type(ButtonType.Capsule)
+             .margin({
+               top: 20
+             })
+             .backgroundColor('#0D9FFB')
+             .width('35%')
+             .height('5%')
+             .onClick(()=>{
+             })
+           }
+             .width('100%')
+         }
+             .height('100%')
+   }
+ }
+</file>
+
+<file path="SmartAgriculture/entry/src/ohosTest/ets/TestAbility/app.ets">
+import hilog from '@ohos.hilog';
+import AbilityDelegatorRegistry from '@ohos.application.abilityDelegatorRegistry'
+import { Hypium } from '@ohos/hypium'
+import testsuite from '../test/List.test'
+
+export default {
+  onCreate() {
+    hilog.isLoggable(0x0000, 'testTag', hilog.LogLevel.INFO);
+    hilog.info(0x0000, 'testTag', '%{public}s', 'Application onCreate');
+    var abilityDelegator: any
+    abilityDelegator = AbilityDelegatorRegistry.getAbilityDelegator()
+    var abilityDelegatorArguments: any
+    abilityDelegatorArguments = AbilityDelegatorRegistry.getArguments()
+    hilog.info(0x0000, 'testTag', '%{public}s', 'start run testcase!!!');
+    Hypium.hypiumTest(abilityDelegator, abilityDelegatorArguments, testsuite)
+  },
+  onDestroy() {
+      hilog.isLoggable(0x0000, 'testTag', hilog.LogLevel.INFO);
+      hilog.info(0x0000, 'testTag', '%{public}s', 'Application onDestroy');
+  },
+}
+</file>
+
+<file path="SmartAgriculture/entry/src/ohosTest/ets/TestRunner/OpenHarmonyTestRunner.ts">
+import hilog from '@ohos.hilog';
+import TestRunner from '@ohos.application.testRunner'
+import AbilityDelegatorRegistry from '@ohos.application.abilityDelegatorRegistry'
+
+var abilityDelegator = undefined
+var abilityDelegatorArguments = undefined
+
+function translateParamsToString(parameters) {
+    const keySet = new Set([
+        '-s class', '-s notClass', '-s suite', '-s itName',
+        '-s level', '-s testType', '-s size', '-s timeout',
+        '-s package', '-s dryRun'
+    ])
+    let targetParams = '';
+    for (const key in parameters) {
+        if (keySet.has(key)) {
+            targetParams += ' ' + key + ' ' + parameters[key]
+        }
+    }
+    return targetParams.trim()
+}
+
+async function onAbilityCreateCallback() {
+    hilog.isLoggable(0x0000, 'testTag', hilog.LogLevel.INFO);
+    hilog.info(0x0000, 'testTag', '%{public}s', 'onAbilityCreateCallback');
+}
+
+async function addAbilityMonitorCallback(err: any) {
+    hilog.isLoggable(0x0000, 'testTag', hilog.LogLevel.INFO);
+    hilog.info(0x0000, 'testTag', 'addAbilityMonitorCallback : %{public}s',
+        JSON.stringify(err) ?? '');
+}
+
+export default class OpenHarmonyTestRunner implements TestRunner {
+    constructor() {
+    }
+
+    onPrepare() {
+        hilog.isLoggable(0x0000, 'testTag', hilog.LogLevel.INFO);
+        hilog.info(0x0000, 'testTag', '%{public}s', 'OpenHarmonyTestRunner OnPrepare');
+    }
+
+    onRun() {
+        hilog.isLoggable(0x0000, 'testTag', hilog.LogLevel.INFO);
+        hilog.info(0x0000, 'testTag', '%{public}s', 'OpenHarmonyTestRunner onRun run');
+        abilityDelegatorArguments = AbilityDelegatorRegistry.getArguments()
+        abilityDelegator = AbilityDelegatorRegistry.getAbilityDelegator()
+
+        let lMonitor = {
+            abilityName: testAbilityName,
+            onAbilityCreate: onAbilityCreateCallback,
+        };
+        var testAbilityName = abilityDelegatorArguments.parameters['-p'] + '.TestAbility'
+        abilityDelegator.addAbilityMonitor(lMonitor, addAbilityMonitorCallback)
+        var cmd = 'aa start -d 0 -a ' + testAbilityName + ' -b ' + abilityDelegatorArguments.bundleName
+        cmd += ' '+translateParamsToString(abilityDelegatorArguments.parameters)
+        var debug = abilityDelegatorArguments.parameters['-D']
+        if (debug == 'true')
+        {
+            cmd += ' -D'
+        }
+        hilog.isLoggable(0x0000, 'testTag', hilog.LogLevel.INFO);
+        hilog.info(0x0000, 'testTag', 'cmd : %{public}s', cmd);
+        abilityDelegator.executeShellCommand(cmd,
+            (err: any, d: any) => {
+                hilog.info(0x0000, 'testTag', 'executeShellCommand : err : %{public}s',
+                    JSON.stringify(err) ?? '');
+                hilog.info(0x0000, 'testTag', 'executeShellCommand : data : %{public}s',
+                    d.stdResult ?? '');
+                hilog.info(0x0000, 'testTag', 'executeShellCommand : data : %{public}s',
+                    d.exitCode ?? '');
+            })
+        hilog.info(0x0000, 'testTag', '%{public}s',
+            'OpenHarmonyTestRunner onRun call abilityDelegator.getAppContext');
+        var context = abilityDelegator.getAppContext()
+        hilog.info(0x0000, 'testTag', 'getAppContext : %{public}s',
+            JSON.stringify(context) ?? '');
+        hilog.info(0x0000, 'testTag', '%{public}s', 'OpenHarmonyTestRunner onRun end');
+    }
+};
+</file>
+
+<file path="SmartAgriculture/entry/src/ohosTest/resources/base/element/string.json">
+{
+  "string": [
+    {
+      "name": "TestAbility_desc",
+      "value": "the test ability"
+    },
+    {
+      "name": "TestAbility_label",
+      "value": "test label"
+    }
+  ]
+}
+</file>
+
+<file path="SmartAgriculture/entry/src/ohosTest/config.json">
+{
+  "app": {
+    "bundleName": "com.example.smartagriculture",
+    "vendor": "example",
+    "version": {
+      "code": 1000000,
+      "name": "1.0.0"
+    }
+  },
+  "deviceConfig": {},
+  "module": {
+    "package": "com.example.smartagriculture_test",
+    "name": ".entry_test",
+    "mainAbility": ".TestAbility",
+    "deviceType": [
+      "default",
+      "tablet"
+    ],
+    "distro": {
+      "deliveryWithInstall": true,
+      "moduleName": "entry_test",
+      "moduleType": "feature",
+      "installationFree": false
+    },
+    "abilities": [
+      {
+        "skills": [
+          {
+            "entities": [
+              "entity.system.home"
+            ],
+            "actions": [
+              "action.system.home"
+            ]
+          }
+        ],
+        "orientation": "unspecified",
+        "visible": true,
+        "srcPath": "TestAbility",
+        "name": ".TestAbility",
+        "srcLanguage": "ets",
+        "icon": "$media:icon",
+        "description": "$string:TestAbility_desc",
+        "formsEnabled": false,
+        "label": "$string:TestAbility_label",
+        "type": "page",
+        "launchType": "standard"
+      }
+    ],
+    "js": [
+      {
+        "mode": {
+          "syntax": "ets",
+          "type": "pageAbility"
+        },
+        "pages": [
+          "pages/index"
+        ],
+        "name": ".TestAbility",
+        "window": {
+          "designWidth": 720,
+          "autoDesignWidth": false
+        }
+      }
+    ]
+  }
+}
+</file>
+
+<file path="SmartAgriculture/entry/.gitignore">
+/node_modules
+/.preview
+/build
+/.cxx
+</file>
+
+<file path="SmartAgriculture/entry/build-profile.json5">
+{
+  "apiType": 'faMode',
+  "showInServiceCenter": true,
+  "buildOption": {
+  },
+  "targets": [
+    {
+      "name": "default",
+    },
+    {
+      "name": "ohosTest",
+    }
+  ]
+}
+</file>
+
+<file path="SmartAgriculture/entry/hvigorfile.ts">
+// Script for compiling build behavior. It is built in the build plug-in and cannot be modified currently.
+export { legacyHapTasks } from '@ohos/hvigor-ohos-plugin';
+</file>
+
+<file path="SmartAgriculture/entry/package.json">
+{
+  "license": "ISC",
+  "devDependencies": {},
+  "name": "entry",
+  "ohos": {
+    "org": "huawei",
+    "directoryLevel": "module",
+    "buildTool": "hvigor"
+  },
+  "description": "example description",
+  "repository": {},
+  "version": "1.0.0",
+  "dependencies": {}
+}
+</file>
+
+<file path="SmartAgriculture/.gitignore">
+/node_modules
+/local.properties
+/.idea
+**/build
+/.hvigor
+.cxx
+/.clangd
+/.clang-format
+/.clang-tidy
+</file>
+
+<file path="SmartAgriculture/build-profile.json5">
+{
+  "app": {
+    "signingConfigs": [
+      {
+        "name": "default",
+        "material": {
+          "certpath": "C:\\Users\\钟振泽\\.ohos\\config\\openharmony\\auto_ohos_default_SmartAgriculture_com.example.smartagriculture.cer",
+          "storePassword": "0000001B646B4B80B88BCFFA8C6D2DDFBD9E65EFFBA7A135C405E58B1694C47FD9DD351227E17049679A05",
+          "keyAlias": "debugKey",
+          "keyPassword": "0000001B8C6E61FA08140A732AE4EFCF2B5308877A6162F2B8355F8A777D3FFEC1A76523D50268253316DA",
+          "profile": "C:\\Users\\钟振泽\\.ohos\\config\\openharmony\\auto_ohos_default_SmartAgriculture_com.example.smartagriculture.p7b",
+          "signAlg": "SHA256withECDSA",
+          "storeFile": "C:\\Users\\钟振泽\\.ohos\\config\\openharmony\\auto_ohos_default_SmartAgriculture_com.example.smartagriculture.p12"
+        }
+      }
+    ],
+    "compileSdkVersion": 8,
+    "compatibleSdkVersion": 8,
+    "products": [
+      {
+        "name": "default",
+        "signingConfig": "default",
+      }
+    ]
+  },
+  "modules": [
+    {
+      "name": "entry",
+      "srcPath": "./entry",
+      "targets": [
+        {
+          "name": "default",
+          "applyToProducts": [
+            "default"
+          ]
+        }
+      ]
+    }
+  ]
+}
+</file>
+
+<file path="SmartAgriculture/hvigorfile.ts">
+// Script for compiling build behavior. It is built in the build plug-in and cannot be modified currently.
+export { legacyAppTasks } from '@ohos/hvigor-ohos-plugin';
+</file>
+
+<file path="SmartAgriculture/package.json">
+{
+  "license": "ISC",
+  "devDependencies": {},
+  "name": "smartagriculture",
+  "ohos": {
+    "org": "huawei",
+    "directoryLevel": "project",
+    "buildTool": "hvigor"
+  },
+  "description": "example description",
+  "repository": {},
+  "version": "1.0.0",
+  "dependencies": {
+    "@ohos/hypium": "1.0.3",
+    "@ohos/hvigor-ohos-plugin": "2.4.2",
+    "@ohos/hvigor": "2.4.2"
+  }
+}
+</file>
+
+</files>

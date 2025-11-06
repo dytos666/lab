@@ -1,0 +1,11 @@
+<div class="container" onclick="routerEvent">
+    <stack>
+        <div class="container-img">
+            <image src="/common/widget.png" class="bg-img"></image>
+        </div>
+        <div class="container-inner">
+            <text class="title">{{ $t('strings.title_immersive') }}</text>
+            <text class="detail_text">{{ $t('strings.detail_immersive') }}</text>
+        </div>
+    </stack>
+</div>

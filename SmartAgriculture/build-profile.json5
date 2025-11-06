@@ -1,0 +1,40 @@
+{
+  "app": {
+    "signingConfigs": [
+      {
+        "name": "default",
+        "material": {
+          "certpath": "C:\\Users\\钟振泽\\.ohos\\config\\openharmony\\auto_ohos_default_SmartAgriculture_com.example.smartagriculture.cer",
+          "storePassword": "0000001B646B4B80B88BCFFA8C6D2DDFBD9E65EFFBA7A135C405E58B1694C47FD9DD351227E17049679A05",
+          "keyAlias": "debugKey",
+          "keyPassword": "0000001B8C6E61FA08140A732AE4EFCF2B5308877A6162F2B8355F8A777D3FFEC1A76523D50268253316DA",
+          "profile": "C:\\Users\\钟振泽\\.ohos\\config\\openharmony\\auto_ohos_default_SmartAgriculture_com.example.smartagriculture.p7b",
+          "signAlg": "SHA256withECDSA",
+          "storeFile": "C:\\Users\\钟振泽\\.ohos\\config\\openharmony\\auto_ohos_default_SmartAgriculture_com.example.smartagriculture.p12"
+        }
+      }
+    ],
+    "compileSdkVersion": 8,
+    "compatibleSdkVersion": 8,
+    "products": [
+      {
+        "name": "default",
+        "signingConfig": "default",
+      }
+    ]
+  },
+  "modules": [
+    {
+      "name": "entry",
+      "srcPath": "./entry",
+      "targets": [
+        {
+          "name": "default",
+          "applyToProducts": [
+            "default"
+          ]
+        }
+      ]
+    }
+  ]
+}

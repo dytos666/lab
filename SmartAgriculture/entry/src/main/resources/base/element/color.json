@@ -1,0 +1,516 @@
+{
+  "color": [
+    {
+      "name": "green0",
+      "value": "#57BE6E"
+    },
+    {
+      "name": "green1",
+      "value": "#95EC72"
+    },
+    {
+      "name": "grey0",
+      "value": "#EDEDED"
+    },
+    {
+      "name": "grey1",
+      "value": "#F7F7F7"
+    },
+    {
+      "name": "grey2",
+      "value": "#DBDBDB"
+    },
+    {
+      "name": "grey3",
+      "value": "#9E9E9E"
+    },
+    {
+      "name": "grey4",
+      "value": "#F7F7F7"
+    },
+    {
+      "name": "white",
+      "value": "#FFFFFF"
+    },
+    {
+      "name": "black",
+      "value": "#000000"
+    },
+    {
+      "name": "blue_link",
+      "value": "#60678B"
+    },
+    {
+      "name": "appBg",
+      "value": "#F1F3F5"
+    },
+    {
+      "name": "toastBg",
+      "value": "#F24D4D4D"
+    },
+    {
+      "name": "cardBg",
+      "value": "#FFFFFF"
+    },
+    {
+      "name": "danger",
+      "value": "#E84026"
+    },
+    {
+      "name": "warning",
+      "value": "#ED6F21"
+    },
+    {
+      "name": "success",
+      "value": "#64BB5C"
+    },
+    {
+      "name": "info",
+      "value": "#0A59F7"
+    },
+    {
+      "name": "controlBg",
+      "value": "#0C000000"
+    },
+    {
+      "name": "controlFg",
+      "value": "#000000"
+    },
+    {
+      "name": "controlBorder",
+      "value": "#254FF7"
+    },
+    {
+      "name": "controlFocusBg",
+      "value": "#FFFFFF"
+    },
+    {
+      "name": "controlFocusFg",
+      "value": "#000000"
+    },
+    {
+      "name": "controlFocusBorder",
+      "value": "#254FF7"
+    },
+    {
+      "name": "controlFocusBg2",
+      "value": "#66000000"
+    },
+    {
+      "name": "controlFocusBorder2",
+      "value": "#254FF7"
+    },
+    {
+      "name": "fgActived",
+      "value": "#0A59F7"
+    },
+    {
+      "name": "fgFocusActived",
+      "value": "#5291FF"
+    },
+    {
+      "name": "fgLevel1",
+      "value": "#000000"
+    },
+    {
+      "name": "fgFocusLevel1",
+      "value": "#FFFFFF"
+    },
+    {
+      "name": "fgLevel2",
+      "value": "#99000000"
+    },
+    {
+      "name": "fgFocusLevel2",
+      "value": "#99FFFFFF"
+    },
+    {
+      "name": "fgLevel3",
+      "value": "#66000000"
+    },
+    {
+      "name": "fgFocusLevel3",
+      "value": "#66FFFFFF"
+    },
+    {
+      "name": "fgLevel4",
+      "value": "#33000000"
+    },
+    {
+      "name": "fgFocusLevel4",
+      "value": "#33FFFFFF"
+    },
+    {
+      "name": "kbdFg",
+      "value": "#FFFFFF"
+    },
+    {
+      "name": "kbdBg",
+      "value": "#000000"
+    },
+    {
+      "name": "emui1",
+      "value": "#564AF7"
+    },
+    {
+      "name": "emui2",
+      "value": "#46B1E3"
+    },
+    {
+      "name": "emui3",
+      "value": "#61CFBE"
+    },
+    {
+      "name": "emui4",
+      "value": "#64BB5C"
+    },
+    {
+      "name": "emui5",
+      "value": "#A5D61D"
+    },
+    {
+      "name": "emui6",
+      "value": "#AC49F5"
+    },
+    {
+      "name": "emui7",
+      "value": "#E64566"
+    },
+    {
+      "name": "emui8",
+      "value": "#E84026"
+    },
+    {
+      "name": "emui9",
+      "value": "#ED6F21"
+    },
+    {
+      "name": "emui10",
+      "value": "#F9A01E"
+    },
+    {
+      "name": "emui11",
+      "value": "#F7CE00"
+    },
+    {
+      "name": "emuiLow1",
+      "value": "#8981F7"
+    },
+    {
+      "name": "emuiLow2",
+      "value": "#86C5E3"
+    },
+    {
+      "name": "emuiLow3",
+      "value": "#92D6CC"
+    },
+    {
+      "name": "emuiLow4",
+      "value": "#92C48D"
+    },
+    {
+      "name": "emuiLow5",
+      "value": "#BDDB69"
+    },
+    {
+      "name": "emuiLow6",
+      "value": "#C386F0"
+    },
+    {
+      "name": "emuiLow7",
+      "value": "#E67C92"
+    },
+    {
+      "name": "emuiLow8",
+      "value": "#E87361"
+    },
+    {
+      "name": "emuiLow9",
+      "value": "#ED955F"
+    },
+    {
+      "name": "emuiLow10",
+      "value": "#F9BC64"
+    },
+    {
+      "name": "emuiLow11",
+      "value": "#F5DC62"
+    },
+    {
+      "name": "morandi1",
+      "value": "#BBB2C8"
+    },
+    {
+      "name": "morandi2",
+      "value": "#B6C5D1"
+    },
+    {
+      "name": "morandi3",
+      "value": "#A6C2BE"
+    },
+    {
+      "name": "morandi4",
+      "value": "#B6C6B3"
+    },
+    {
+      "name": "morandi5",
+      "value": "#C1C8AC"
+    },
+    {
+      "name": "morandi6",
+      "value": "#C2B1C8"
+    },
+    {
+      "name": "morandi7",
+      "value": "#D1BFC5"
+    },
+    {
+      "name": "morandi8",
+      "value": "#CFB4B4"
+    },
+    {
+      "name": "morandi9",
+      "value": "#D4BFB8"
+    },
+    {
+      "name": "morandi10",
+      "value": "#D2C3B2"
+    },
+    {
+      "name": "morandi11",
+      "value": "#D2CAB3"
+    },
+    {
+      "name": "appBg_alpha",
+      "value": "#00FFFFFF"
+    },
+    {
+      "name": "toastBg_alpha",
+      "value": "#F24D4D4D"
+    },
+    {
+      "name": "cardBg_alpha",
+      "value": "#00FFFFFF"
+    },
+    {
+      "name": "danger_alpha",
+      "value": "#E84026"
+    },
+    {
+      "name": "warning_alpha",
+      "value": "#ED6F21"
+    },
+    {
+      "name": "success_alpha",
+      "value": "#64BB5C"
+    },
+    {
+      "name": "info_alpha",
+      "value": "#0A59F7"
+    },
+    {
+      "name": "controlBg_alpha",
+      "value": "#33FFFFFF"
+    },
+    {
+      "name": "controlFg_alpha",
+      "value": "#000000"
+    },
+    {
+      "name": "controlBorder_alpha",
+      "value": "#254FF7"
+    },
+    {
+      "name": "controlFocusBg_alpha",
+      "value": "#FFFFFF"
+    },
+    {
+      "name": "controlFocusFg_alpha",
+      "value": "#000000"
+    },
+    {
+      "name": "controlFocusBorder_alpha",
+      "value": "#254FF7"
+    },
+    {
+      "name": "controlFocusBg2_alpha",
+      "value": "#66000000"
+    },
+    {
+      "name": "controlFocusBorder2_alpha",
+      "value": "#254FF7"
+    },
+    {
+      "name": "fgActived_alpha",
+      "value": "#5291FF"
+    },
+    {
+      "name": "fgFocusActived_alpha",
+      "value": "#5291FF"
+    },
+    {
+      "name": "fgLevel1_alpha",
+      "value": "#FFFFFF"
+    },
+    {
+      "name": "fgFocusLevel1_alpha",
+      "value": "#FFFFFF"
+    },
+    {
+      "name": "fgLevel2_alpha",
+      "value": "#99FFFFFF"
+    },
+    {
+      "name": "fgFocusLevel2_alpha",
+      "value": "#99FFFFFF"
+    },
+    {
+      "name": "fgLevel3_alpha",
+      "value": "#66FFFFFF"
+    },
+    {
+      "name": "fgFocusLevel3_alpha",
+      "value": "#66FFFFFF"
+    },
+    {
+      "name": "fgLevel4_alpha",
+      "value": "#33FFFFFF"
+    },
+    {
+      "name": "fgFocusLevel4_alpha",
+      "value": "#33FFFFFF"
+    },
+    {
+      "name": "emui1_alpha",
+      "value": "#564AF7"
+    },
+    {
+      "name": "emui2_alpha",
+      "value": "#46B1E3"
+    },
+    {
+      "name": "emui3_alpha",
+      "value": "#61CFBE"
+    },
+    {
+      "name": "emui4_alpha",
+      "value": "#64BB5C"
+    },
+    {
+      "name": "emui5_alpha",
+      "value": "#A5D61D"
+    },
+    {
+      "name": "emui6_alpha",
+      "value": "#AC49F5"
+    },
+    {
+      "name": "emui7_alpha",
+      "value": "#E64566"
+    },
+    {
+      "name": "emui8_alpha",
+      "value": "#E84026"
+    },
+    {
+      "name": "emui9_alpha",
+      "value": "#ED6F21"
+    },
+    {
+      "name": "emui10_alpha",
+      "value": "#F9A01E"
+    },
+    {
+      "name": "emui11_alpha",
+      "value": "#F7CE00"
+    },
+    {
+      "name": "emuiLow1_alpha",
+      "value": "#8981F7"
+    },
+    {
+      "name": "emuiLow2_alpha",
+      "value": "#86C5E3"
+    },
+    {
+      "name": "emuiLow3_alpha",
+      "value": "#92D6CC"
+    },
+    {
+      "name": "emuiLow4_alpha",
+      "value": "#92C48D"
+    },
+    {
+      "name": "emuiLow5_alpha",
+      "value": "#BDDB69"
+    },
+    {
+      "name": "emuiLow6_alpha",
+      "value": "#C386F0"
+    },
+    {
+      "name": "emuiLow7_alpha",
+      "value": "#E67C92"
+    },
+    {
+      "name": "emuiLow8_alpha",
+      "value": "#E87361"
+    },
+    {
+      "name": "emuiLow9_alpha",
+      "value": "#ED955F"
+    },
+    {
+      "name": "emuiLow10_alpha",
+      "value": "#F9BC64"
+    },
+    {
+      "name": "emuiLow11_alpha",
+      "value": "#F5DC62"
+    },
+    {
+      "name": "morandi1_alpha",
+      "value": "#BBB2C8"
+    },
+    {
+      "name": "morandi2_alpha",
+      "value": "#B6C5D1"
+    },
+    {
+      "name": "morandi3_alpha",
+      "value": "#A6C2BE"
+    },
+    {
+      "name": "morandi4_alpha",
+      "value": "#B6C6B3"
+    },
+    {
+      "name": "morandi5_alpha",
+      "value": "#C1C8AC"
+    },
+    {
+      "name": "morandi6_alpha",
+      "value": "#C2B1C8"
+    },
+    {
+      "name": "morandi7_alpha",
+      "value": "#D1BFC5"
+    },
+    {
+      "name": "morandi8_alpha",
+      "value": "#CFB4B4"
+    },
+    {
+      "name": "morandi9_alpha",
+      "value": "#D4BFB8"
+    },
+    {
+      "name": "morandi10_alpha",
+      "value": "#D2C3B2"
+    },
+    {
+      "name": "morandi11_alpha",
+      "value": "#D2CAB3"
+    }
+  ]
+}
